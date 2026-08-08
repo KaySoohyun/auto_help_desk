@@ -52,3 +52,12 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/main.py` — router admin registrado.
 - Tests: `tests/test_permissions.py` + `tests/test_tenant_isolation.py` (aislamiento multi-tenant).
 - Suite completa: 20 tests pasados (incluye regresión de feature 002).
+
+### Fase 2 · Cifrado, secretos y protección de datos — rama `feature/004-cifrado-secretos`
+
+- Feature 004 creada en `ia_docs/features/004-cifrado-secretos/`.
+- `app/core/crypto.py` — cifrado AES-GCM de campos con clave derivada por HKDF desde `SECRET_KEY`; formato versionado `cipher:<v>:<salt>:<nonce>:<ct>:<tag>` con detección de manipulación.
+- `app/core/config.py` — propiedad `encryption_key` (derivada de `SECRET_KEY`, nunca persistida).
+- `ia_docs/architecture/04-threat-model-seguridad.md` — sección 6: cifrado en reposo/tránsito y plan de gestión de secretos (Vault).
+- Tests: `tests/test_crypto.py` (round-trip, unicode, tamper nonce/ct, clave incorrecta, versión, formato, interop GCM).
+- Suite completa: 31 tests pasados (incluye regresión de features 002-003).
