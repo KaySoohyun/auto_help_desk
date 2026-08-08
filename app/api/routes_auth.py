@@ -29,6 +29,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserOut,
 )
+from app.services.audit import AuditService, get_audit_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -70,7 +71,11 @@ def _issue_tokens(user: User, db: Session) -> TokenResponse:
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
+def register(
+    payload: RegisterRequest,
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> User:
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El email ya está registrado")
@@ -85,13 +90,31 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    audit.log(
+        "auth.user_registered",
+        user_id=user.id,
+        tenant_id=user.tenant_id,
+        service="auth",
+        result="success",
+        detail={"role": user.role},
+    )
     return user
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(
+    payload: LoginRequest,
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email))
     if user is None or not verify_password(payload.password, user.password_hash):
+        audit.log(
+            "auth.login_failed",
+            service="auth",
+            detail={"email": payload.email},
+            result="failure",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales inválidas",
@@ -101,28 +124,44 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivo",
         )
+    audit.log(
+        "auth.login_success",
+        user_id=user.id,
+        tenant_id=user.tenant_id,
+        service="auth",
+        result="success",
+    )
     return _issue_tokens(user, db)
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def refresh(
+    payload: RefreshRequest,
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> TokenResponse:
     try:
         claims = decode_token(payload.refresh_token)
     except TokenExpiredError as exc:
+        audit.log("auth.refresh_failed", service="auth", result="failure", detail={"reason": "expired"})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco expirado") from exc
     except TokenInvalidError as exc:
+        audit.log("auth.refresh_failed", service="auth", result="failure", detail={"reason": "invalid"})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco inválido") from exc
 
     if claims.get("type") != TOKEN_TYPE_REFRESH:
+        audit.log("auth.refresh_failed", service="auth", result="failure", detail={"reason": "wrong_type"})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco inválido")
 
     stored = db.get(RefreshToken, claims.get("jti"))
     if stored is None or stored.revoked:
+        audit.log("auth.refresh_failed", service="auth", result="failure", detail={"reason": "revoked"})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco revocado")
 
     if datetime.now(UTC).replace(tzinfo=None) > stored.expires_at.replace(tzinfo=None):
         stored.revoked = True
         db.commit()
+        audit.log("auth.refresh_failed", service="auth", result="failure", detail={"reason": "expired"})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco expirado")
 
     user = db.get(User, int(claims["sub"]))
@@ -133,11 +172,22 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
     stored.revoked_at = datetime.now(UTC)
     db.commit()
 
+    audit.log(
+        "auth.refresh",
+        user_id=user.id,
+        tenant_id=user.tenant_id,
+        service="auth",
+        result="success",
+    )
     return _issue_tokens(user, db)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(payload: LogoutRequest, db: Session = Depends(get_db)) -> None:
+def logout(
+    payload: LogoutRequest,
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> None:
     try:
         claims = decode_token(payload.refresh_token)
     except TokenError:
@@ -149,7 +199,25 @@ def logout(payload: LogoutRequest, db: Session = Depends(get_db)) -> None:
         stored.revoked_at = datetime.now(UTC)
         db.commit()
 
+    audit.log(
+        "auth.logout",
+        user_id=int(claims["sub"]) if claims.get("sub") else None,
+        tenant_id=claims.get("tenant_id") or None,
+        service="auth",
+        result="success",
+    )
+
 
 @router.get("/me", response_model=UserOut)
-def me(user: User = Depends(get_current_user)) -> User:
+def me(
+    user: User = Depends(get_current_user),
+    audit: AuditService = Depends(get_audit_service),
+) -> User:
+    audit.log(
+        "auth.access_me",
+        user_id=user.id,
+        tenant_id=user.tenant_id,
+        service="auth",
+        result="success",
+    )
     return user
