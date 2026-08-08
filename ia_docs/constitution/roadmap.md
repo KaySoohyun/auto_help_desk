@@ -16,12 +16,13 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 10. **010 · Orquestador LLM y conectores de IA** — punto único de llamadas LLM (ADR-002): proveedores HTTP (httpx, OpenAI-compatible) y mock, timeout/reintentos con backoff, rate limit en memoria por tenant+usuario, fallback seguro (`LLMUnavailableError`), métricas de tokens/latencia/errores (feature 009) y auditoría `llm.call` sin prompts. Expone `POST /v1/ai/ping` y `GET /v1/ai/info`.
 11. **011 · Clasificación automática de tickets** — servicio `TicketClassifier` sobre el orquestador: contexto redactado de PII, prompt versionado, salida JSON validada (categoría, subcategoría, intención, prioridad, confianza, rationale, warnings), persistencia en `ai_suggestions` (draft) y umbral de confianza con advertencia de revisión humana. `POST /v1/ai/tickets/{id}/classify`.
 12. **012 · Resumen automático de tickets** — `TicketSummarizer` con el mismo pipeline seguro: contexto redactado, tarea `summary`, resumen breve y accionable + información faltante, persistencia en `ai_suggestions` (draft) y umbral de confianza. `POST /v1/ai/tickets/{id}/summary`.
+13. **013 · Sugerencia de respuesta editable** — `TicketReplySuggester` con el mismo pipeline seguro: contexto redactado, tarea `reply`, borrador editable con grounding y fuentes (FR-08), `policyFlags` para aspectos no verificables, persistencia en `ai_suggestions` (draft) y umbral de confianza. `POST /v1/ai/tickets/{id}/suggested-reply`.
 
 ## Siguiente 🔜
 
 _Lo próximo a abordar: Fase 4 (Integración API IA), una feature en curso a la vez._
 
-13. **013 · Sugerencia de respuesta editable** — borrador con grounding y fuentes.
+14. **014 · Guardrails de IA** — prompt injection, control de alucinaciones, validación de salida y fallback seguro.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 

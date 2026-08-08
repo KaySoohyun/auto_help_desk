@@ -158,3 +158,13 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/api/routes_ai.py` — `POST /v1/ai/tickets/{ticket_id}/summary` con `REQUEST_AI_SUGGESTION`; 404 otro tenant, 429, 503, 422.
 - Tests: `tests/test_summary.py` (8 tests: éxito con mock, baja confianza→warnings, otro tenant→404, 401, 503, 422, persistencia sin PII, auditoría+métricas).
 - Suite completa: **114 tests pasados** (incluye regresión de features 002-011).
+
+### Fase 4 · Sugerencia de respuesta editable — rama `feature/013-sugerencia-respuesta`
+
+- Feature 013 creada en `ia_docs/features/013-sugerencia-respuesta/`.
+- `app/prompts/reply.py` — prompt versionado `1.0.0` con separación instrucciones/datos (guardrail §12.1) y reglas de grounding (FR-08): basar solo en el contexto del ticket, no inventar precios/políticas/plazos, declarar fuentes y `policyFlags`.
+- `app/services/reply_suggester.py` — `TicketReplySuggester.suggest_reply()`: contexto redactado de PII (asunto/descripción/historial con `PiiRedactor`), orquestador (tarea `reply`), validación JSON (`ReplyError` como fallback seguro), persistencia `AISuggestion(type='reply')` draft, auditoría `ai.replied` sin PII y métrica `ai_replies_total`.
+- `app/schemas/ai.py` — `SuggestedReplyOut` (spec §15.3 + suggestionId + traceId) y `SuggestedReplyRequest` (tone/language opcionales).
+- `app/api/routes_ai.py` — `POST /v1/ai/tickets/{ticket_id}/suggested-reply` con `REQUEST_AI_SUGGESTION`; 404 otro tenant, 429 rate limit, 503 LLM caído, 422 JSON inválido.
+- Tests: `tests/test_reply.py` (9 tests: éxito con mock, tone/language, otro tenant→404, 401, 503, 422, baja confianza→warnings, persistencia sin PII, auditoría+métricas).
+- Suite completa: **123 tests pasados** (incluye regresión de features 002-012).

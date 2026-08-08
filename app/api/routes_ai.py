@@ -6,12 +6,13 @@ from app.core.deps import get_trace_id
 from app.core.permissions import REQUEST_AI_SUGGESTION, VIEW_AUDIT, require_permissions
 from app.database import get_db
 from app.models.user import User
-from app.schemas.ai import ClassificationOut, SummaryOut
+from app.schemas.ai import ClassificationOut, SuggestedReplyOut, SuggestedReplyRequest, SummaryOut
 from app.schemas.llm import LLMPingInfo
 from app.services.audit import AuditService, get_audit_service
 from app.services.classifier import ClassificationError, TicketClassifier
 from app.services.llm import LLMRateLimitExceeded, LLMUnavailableError
 from app.services.llm_orchestrator import LLMOrchestrator
+from app.services.reply_suggester import ReplyError, TicketReplySuggester
 from app.services.summarizer import SummaryError, TicketSummarizer
 
 router = APIRouter(prefix="/v1/ai", tags=["ai"])
@@ -138,6 +139,51 @@ def summarize_ticket(
         summary=result.summary,
         missing_information=result.missing_information,
         confidence=result.confidence,
+        warnings=result.warnings,
+        suggestion_id=suggestion.id,
+        trace_id=trace_id,
+    )
+
+
+@router.post("/tickets/{ticket_id}/suggested-reply", response_model=SuggestedReplyOut)
+def suggest_reply(
+    ticket_id: int,
+    body: SuggestedReplyRequest | None = None,
+    current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_trace),
+) -> SuggestedReplyOut:
+    """Sugiere una respuesta editable para un ticket con IA (spec §15.3). El contexto va redactado de PII."""
+    suggester = TicketReplySuggester(
+        db,
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id,
+        orchestrator=_orchestrator(audit),
+        audit=audit,
+    )
+    try:
+        result, suggestion = suggester.suggest_reply(
+            ticket_id,
+            tone=body.tone if body else None,
+            language=body.language if body else None,
+            trace_id=trace_id,
+        )
+    except LLMRateLimitExceeded as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    except LLMUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="LLM no disponible"
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
+    except ReplyError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return SuggestedReplyOut(
+        suggested_reply=result.suggested_reply,
+        confidence=result.confidence,
+        sources=result.sources,
+        policy_flags=result.policy_flags,
         warnings=result.warnings,
         suggestion_id=suggestion.id,
         trace_id=trace_id,

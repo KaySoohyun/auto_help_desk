@@ -20,3 +20,18 @@ class SummaryOut(BaseModel):
     warnings: list[str] = []
     suggestion_id: int
     trace_id: str | None = None
+
+
+class SuggestedReplyOut(BaseModel):
+    suggested_reply: str
+    confidence: float
+    sources: list[str] = []
+    policy_flags: list[str] = []
+    warnings: list[str] = []
+    suggestion_id: int
+    trace_id: str | None = None
+
+
+class SuggestedReplyRequest(BaseModel):
+    tone: str | None = None
+    language: str | None = None
