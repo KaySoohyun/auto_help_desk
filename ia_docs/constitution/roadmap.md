@@ -2,13 +2,13 @@
 
 _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora y qué viene". Cada entrada apunta a su carpeta en `features/`. Las fases 1-6 referencian `ia_docs/plan-ejecucion.md`._
 
-## Fase 1: Descubrimiento / Diseño 🎨
+## Hecho ✅
 
-_Entregables: catálogo de casos de uso, matriz de requisitos, diagrama de arquitectura cloud multi-tenant, modelo de datos con clasificación de PII, threat model JWT/OAuth + tenant + auditoría, política de redacción/retención, estrategia de prompts y ADRs._
+1. **001 · Fundamentos y arquitectura** — base del repo, configuración `.env`, ADRs y backlog priorizado (Fase 1). Entregables en `ia_docs/architecture/`.
 
-1. **001 · Fundamentos y arquitectura** — base del repo, configuración `.env`, ADRs y backlog priorizado (Fase 1).
+## Siguiente 🔜
 
-## Fase 2: Fundamentos de Plataforma, Identidad y Seguridad 🔐
+_Lo próximo a abordar: Fase 2 (Fundamentos de Plataforma, Identidad y Seguridad), una feature en curso a la vez._
 
 2. **002 · Autenticación JWT/OAuth** — login, validación de tokens, expiración, scopes y revocación.
 3. **003 · Autorización por tenant y RBAC** — middleware de aislamiento por tenant y validación de roles (agente, supervisor, admin de tenant, admin de plataforma, servicio IA).
