@@ -61,3 +61,15 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `ia_docs/architecture/04-threat-model-seguridad.md` — sección 6: cifrado en reposo/tránsito y plan de gestión de secretos (Vault).
 - Tests: `tests/test_crypto.py` (round-trip, unicode, tamper nonce/ct, clave incorrecta, versión, formato, interop GCM).
 - Suite completa: 31 tests pasados (incluye regresión de features 002-003).
+
+### Fase 2 · Auditoría, logging y trazabilidad — rama `feature/005-auditoria`
+
+- Feature 005 creada en `ia_docs/features/005-auditoria/`.
+- `app/models/audit.py` — modelo `AuditEvent` append-only con campos mínimos del spec §11.2 (timestamp UTC, tenant, user, acción, trace_id, resultado, confianza, detail sin PII).
+- `app/services/audit.py` — `AuditService` con `log(...)` (solo insert; sin update/delete).
+- `app/core/deps.py` — dependencia `get_trace_id` (uuid por request).
+- `app/api/routes_auth.py` — eventos auditados: login ok/fallido, refresh ok/fallido, logout, register, acceso a `/auth/me`.
+- `app/api/routes_audit.py` — `GET /audit/events` protegido (`VIEW_AUDIT`), filtrado por tenant y paginado.
+- `app/schemas/audit.py` — schema de salida `AuditEventOut`.
+- Tests: `tests/test_audit.py` (auditoría de auth, sin PII, aislamiento por tenant, permisos, append-only).
+- Suite completa: 39 tests pasados (incluye regresión de features 002-004).
