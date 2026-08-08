@@ -15,6 +15,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.metrics import metrics
+from app.services.guardrails import Guardrails, OutputBlockedError
 from app.services.llm import BaseLLMProvider, LLMRateLimitExceeded, LLMUnavailableError
 
 from app.core.rate_limit import RateLimitStore, rate_limit_store
@@ -47,10 +48,12 @@ class LLMOrchestrator:
         provider: BaseLLMProvider | None = None,
         rate_limit: RateLimitStore | None = None,
         audit: AuditPort | None = None,
+        guardrails: Guardrails | None = None,
     ) -> None:
         self._provider = provider
         self._rate_limit = rate_limit or rate_limit_store
         self._audit = audit
+        self._guardrails = guardrails or Guardrails()
 
     @property
     def provider(self) -> BaseLLMProvider | None:
@@ -94,6 +97,19 @@ class LLMOrchestrator:
             )
             raise LLMRateLimitExceeded("Se excedió el límite de llamadas LLM")
 
+        input_report = self._guardrails.check_input(user)
+        if input_report.reasons:
+            self._audit_call(
+                task=task,
+                model=model,
+                status="alert",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                trace_id=trace_id,
+                detail={"reasons": input_report.reasons},
+            )
+            logger.warning("Posible prompt injection en entrada", extra={"task": task, "reasons": input_report.reasons})
+
         provider = self._effective_provider()
         try:
             response = self._complete_with_retries(provider, task, system, user, model, temperature)
@@ -120,6 +136,22 @@ class LLMOrchestrator:
                 trace_id=trace_id,
             )
             raise LLMUnavailableError("LLM no disponible") from exc
+
+        output_report = self._guardrails.check_output(response.content)
+        if output_report.blocked:
+            for reason in output_report.reasons:
+                metrics.inc("ai_guardrail_blocks_total", labels={"reason": reason, "task": task})
+            self._audit_call(
+                task=task,
+                model=response.model,
+                status="blocked",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                trace_id=trace_id,
+                detail={"reasons": output_report.reasons},
+            )
+            logger.warning("Salida LLM bloqueada por guardrails", extra={"task": task, "reasons": output_report.reasons})
+            raise OutputBlockedError("Contenido bloqueado por política de seguridad")
 
         metrics.inc("llm_calls_total", labels={"task": task, "status": "ok"})
         metrics.observe("llm_latency_seconds", response.duration_seconds, labels={"task": task})
@@ -188,7 +220,7 @@ class LLMOrchestrator:
             tenant_id=tenant_id,
             service="llm",
             trace_id=trace_id,
-            result="success" if status == "success" else "failure",
+            result=status,
             detail=dict(detail or {}) | {"task": task, "status": status, "model": model},
         )
 

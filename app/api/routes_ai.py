@@ -10,6 +10,7 @@ from app.schemas.ai import ClassificationOut, SuggestedReplyOut, SuggestedReplyR
 from app.schemas.llm import LLMPingInfo
 from app.services.audit import AuditService, get_audit_service
 from app.services.classifier import ClassificationError, TicketClassifier
+from app.services.guardrails import OutputBlockedError
 from app.services.llm import LLMRateLimitExceeded, LLMUnavailableError
 from app.services.llm_orchestrator import LLMOrchestrator
 from app.services.reply_suggester import ReplyError, TicketReplySuggester
@@ -48,6 +49,11 @@ def ai_ping(
     except LLMUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="LLM no disponible"
+        ) from exc
+    except OutputBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Contenido bloqueado por política de seguridad",
         ) from exc
     return LLMPingInfo(ok=True, model=result["model"], trace_id=trace_id)
 
@@ -94,6 +100,11 @@ def classify_ticket(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
     except ClassificationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except OutputBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Contenido bloqueado por política de seguridad",
+        ) from exc
     return ClassificationOut(
         category=result.category,
         subcategory=result.subcategory,
@@ -135,6 +146,11 @@ def summarize_ticket(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
     except SummaryError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except OutputBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Contenido bloqueado por política de seguridad",
+        ) from exc
     return SummaryOut(
         summary=result.summary,
         missing_information=result.missing_information,
@@ -179,6 +195,11 @@ def suggest_reply(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
     except ReplyError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except OutputBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Contenido bloqueado por política de seguridad",
+        ) from exc
     return SuggestedReplyOut(
         suggested_reply=result.suggested_reply,
         confidence=result.confidence,

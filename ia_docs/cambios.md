@@ -168,3 +168,13 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/api/routes_ai.py` — `POST /v1/ai/tickets/{ticket_id}/suggested-reply` con `REQUEST_AI_SUGGESTION`; 404 otro tenant, 429 rate limit, 503 LLM caído, 422 JSON inválido.
 - Tests: `tests/test_reply.py` (9 tests: éxito con mock, tone/language, otro tenant→404, 401, 503, 422, baja confianza→warnings, persistencia sin PII, auditoría+métricas).
 - Suite completa: **123 tests pasados** (incluye regresión de features 002-012).
+
+### Fase 4 · Guardrails de IA — rama `feature/014-guardrails-ia`
+
+- Feature 014 creada en `ia_docs/features/014-guardrails-ia/`.
+- `app/services/guardrails.py` — `Guardrails` con `check_output()` (filtra salida del LLM: PII CRÍTICA no tokenizada vía `PiiRedactor.detect` = eco de PII T3, y contenido prohibido como jailbreak/cambio de rol/exfiltración; §12.3) y `check_input()` (patrones de prompt injection en el contexto del ticket, informativo sin bloquear; §12.1). `OutputBlockedError` y `GuardrailReport`.
+- `app/core/config.py` — settings `guardrails_enabled`, `guardrail_prohibited_patterns` y `guardrail_injection_patterns` (regex conservadoras).
+- `app/services/llm_orchestrator.py` — `complete()` aplica `check_input` (alerta auditada `llm.call` status `alert`, no bloquea) y `check_output` (si bloquea → métrica `ai_guardrail_blocks_total{reason,task}`, auditoría `llm.call` status `blocked` sin contenido, excepción `OutputBlockedError`); `_audit_call` ahora registra `result=status` (success/failure/blocked/alert).
+- `app/api/routes_ai.py` — `OutputBlockedError` mapeado a 422 "Contenido bloqueado por política de seguridad" (spec §13.4) en classify/summary/suggested-reply/ping.
+- Tests: `tests/test_guardrails.py` (11 tests: unitarios check_output/check_input, bloqueo por PII/jailbreak en salida, salida limpia pasa, auditoría+métricas del bloqueo, alerta de entrada auditada sin bloquear, `guardrails_enabled=False`).
+- Suite completa: **134 tests pasados** (incluye regresión de features 002-013).

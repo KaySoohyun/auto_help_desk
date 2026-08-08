@@ -34,6 +34,24 @@ class Settings(BaseSettings):
     )
     ai_classify_intents: str = "request,incident,question,complaint,other"
 
+    guardrails_enabled: bool = True
+    guardrail_prohibited_patterns: list[str] = [
+        r"ignor(?:a|e|ar) (?:todos? las? )?(?:las )?instrucciones",
+        r"reveal(?:ing)? your (?:system|developer) prompt",
+        r"system prompt",
+        r"act as an unrestricted",
+        r"dame tu prompt",
+        r"exfiltra",
+        r"accede a (?:bases de datos|archivos|sistemas internos)",
+    ]
+    guardrail_injection_patterns: list[str] = [
+        r"ignor(?:a|e|ar) (?:todas? las? )?instrucciones",
+        r"eres (?:ahora|un) (?:admin|asistente sin restricciones)",
+        r"reveal(?:ing)? your (?:system|developer) prompt",
+        r"exfiltra",
+        r"cambia tu rol",
+    ]
+
     @property
     def encryption_key(self) -> bytes:
         """Clave de cifrado de campos, derivada de SECRET_KEY (nunca persistida)."""

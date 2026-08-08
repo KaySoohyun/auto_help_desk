@@ -17,18 +17,21 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 11. **011 · Clasificación automática de tickets** — servicio `TicketClassifier` sobre el orquestador: contexto redactado de PII, prompt versionado, salida JSON validada (categoría, subcategoría, intención, prioridad, confianza, rationale, warnings), persistencia en `ai_suggestions` (draft) y umbral de confianza con advertencia de revisión humana. `POST /v1/ai/tickets/{id}/classify`.
 12. **012 · Resumen automático de tickets** — `TicketSummarizer` con el mismo pipeline seguro: contexto redactado, tarea `summary`, resumen breve y accionable + información faltante, persistencia en `ai_suggestions` (draft) y umbral de confianza. `POST /v1/ai/tickets/{id}/summary`.
 13. **013 · Sugerencia de respuesta editable** — `TicketReplySuggester` con el mismo pipeline seguro: contexto redactado, tarea `reply`, borrador editable con grounding y fuentes (FR-08), `policyFlags` para aspectos no verificables, persistencia en `ai_suggestions` (draft) y umbral de confianza. `POST /v1/ai/tickets/{id}/suggested-reply`.
+14. **014 · Guardrails de IA** — capa de guardrails en el orquestador (ADR-002): filtro de salida (PII cruda + contenido prohibido/jailbreak) que bloquea y audita `ai_guardrail_blocks_total` con 422 "Contenido bloqueado por política de seguridad", y alerta de prompt injection en entrada (audita sin bloquear).
 
 ## Siguiente 🔜
 
-_Lo próximo a abordar: Fase 4 (Integración API IA), una feature en curso a la vez._
+_Lo próximo a abordar: Fase 5 (Experiencia de Agente y Administración), una feature en curso a la vez._
 
-14. **014 · Guardrails de IA** — prompt injection, control de alucinaciones, validación de salida y fallback seguro.
+15. **015 · Workspace de agente** — gestión de tickets, colas y panel de asistencia IA (aceptar/editar/rechazar/escalar).
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
 _Completada (features 006-009)._
 
 ## Fase 4: Integración API IA 🤖
+
+_Completada (features 010-014)._
 
 10. **010 · Orquestador LLM y conectores de IA** — gateway con timeouts, reintentos, fallback y límites de uso.
 11. **011 · Clasificación automática de tickets** — categoría, subcategoría, intención y prioridad sugerida con confianza.
