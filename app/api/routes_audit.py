@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,6 +9,7 @@ from app.database import get_db
 from app.models.audit import AuditEvent
 from app.models.user import User
 from app.schemas.audit import AuditEventOut
+from app.services.audit import AuditService, get_audit_service
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -15,18 +18,48 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 def list_audit_events(
     current_user: User = Depends(require_permissions(VIEW_AUDIT)),
     db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    action: str | None = Query(default=None),
+    service: str | None = Query(default=None),
+    user_id: int | None = Query(default=None),
+    result: str | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> list[AuditEvent]:
-    """Lista eventos de auditoría del tenant del usuario (append-only)."""
+    """Lista eventos de auditoría del tenant del usuario (append-only), con filtros."""
     if not current_user.tenant_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Rol sin tenant asignado",
         )
+
+    filters = [AuditEvent.tenant_id == current_user.tenant_id]
+    if action:
+        filters.append(AuditEvent.action == action)
+    if service:
+        filters.append(AuditEvent.service == service)
+    if user_id is not None:
+        filters.append(AuditEvent.user_id == user_id)
+    if result:
+        filters.append(AuditEvent.result == result)
+    if date_from:
+        filters.append(AuditEvent.created_at >= date_from)
+    if date_to:
+        filters.append(AuditEvent.created_at <= date_to)
+
+    audit.log(
+        "audit.view",
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id,
+        service="audit",
+        result="success",
+    )
+
     stmt = (
         select(AuditEvent)
-        .where(AuditEvent.tenant_id == current_user.tenant_id)
+        .where(*filters)
         .order_by(AuditEvent.created_at.desc())
         .limit(limit)
         .offset(offset)
