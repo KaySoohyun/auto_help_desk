@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +16,17 @@ class Settings(BaseSettings):
     jwt_audience: str = "api.example.com"
 
     database_url: str = "sqlite:///./app.db"
+
+    llm_provider: str = "mock"
+    llm_base_url: str = ""
+    llm_api_key: SecretStr = SecretStr("")
+    llm_model: str = "gpt-4o-mini"
+    llm_timeout_seconds: float = 15.0
+    llm_max_retries: int = 2
+    llm_retry_backoff: float = 0.5
+    llm_max_tokens: int = 1024
+    llm_rate_max_calls: int = 60
+    llm_rate_window_seconds: int = 60
 
     @property
     def encryption_key(self) -> bytes:

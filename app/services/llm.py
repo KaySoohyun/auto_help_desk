@@ -1,0 +1,156 @@
+"""Capa de conectores LLM (spec §14.2, ADR-002).
+
+Sin SDKs de proveedores: `httpx` contra un endpoint compatible con OpenAI
+Chat Completions. Implementaciones HTTP real y mock (para dev/tests).
+"""
+
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass
+from typing import Any, Protocol
+
+import httpx
+
+from app.core.config import Settings, settings
+
+
+class LLMUnavailableError(RuntimeError):
+    """El proveedor LLM no respondió tras los reintentos (fallback seguro)."""
+
+
+class LLMRateLimitExceeded(Exception):
+    """Se excedió el límite de llamadas LLM para el usuario/tenant."""
+
+
+@dataclass(frozen=True)
+class LLMUsage:
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.prompt_tokens + self.completion_tokens
+
+
+@dataclass(frozen=True)
+class LLMResponse:
+    content: str
+    model: str
+    usage: LLMUsage
+    duration_seconds: float
+
+
+class BaseLLMProvider(Protocol):
+    """Contrato mínimo de un proveedor LLM."""
+
+    def complete(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        model: str,
+        max_tokens: int,
+        temperature: float = 0,
+    ) -> LLMResponse:
+        """Ejecuta una llamada de chat y devuelve la respuesta."""
+
+
+def _openai_payload(messages: list[dict[str, str]], model: str, max_tokens: int, temperature: float) -> dict[str, Any]:
+    return {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+
+
+class HTTPLLMProvider:
+    """Proveedor HTTP OpenAI-compatible (chat completions)."""
+
+    def __init__(self, base_url: str, api_key: str, timeout_seconds: float) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._api_key = api_key
+        self._timeout = timeout_seconds
+
+    def complete(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        model: str,
+        max_tokens: int,
+        temperature: float = 0,
+    ) -> LLMResponse:
+        started = time.perf_counter()
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+        with httpx.Client(timeout=self._timeout) as client:
+            response = client.post(
+                f"{self._base_url}/v1/chat/completions",
+                headers=headers,
+                json=_openai_payload(messages, model, max_tokens, temperature),
+            )
+            if response.status_code >= 400:
+                raise httpx.HTTPStatusError(
+                    f"LLM error {response.status_code}", request=response.request, response=response
+                )
+            data = response.json()
+        usage = data.get("usage", {})
+        content = data["choices"][0]["message"]["content"]
+        return LLMResponse(
+            content=content,
+            model=data.get("model", model),
+            usage=LLMUsage(
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+            ),
+            duration_seconds=time.perf_counter() - started,
+        )
+
+
+class MockLLMProvider:
+    """Proveedor simulado determinista para desarrollo y pruebas.
+
+    No usa red ni credenciales. `failure_rate` simula errores para probar
+    reintentos/fallback.
+    """
+
+    def __init__(self, model: str = "gpt-4o-mini", failure_rate: float = 0.0) -> None:
+        self.model = model
+        self._failure_rate = failure_rate
+        self._calls = 0
+
+    @property
+    def calls(self) -> int:
+        return self._calls
+
+    def complete(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        model: str,
+        max_tokens: int,
+        temperature: float = 0,
+    ) -> LLMResponse:
+        started = time.perf_counter()
+        user_message = messages[-1]["content"] if messages else ""
+        failure_reached = self._failure_rate > 0 and (self._calls % 2 == 1)
+        if failure_reached:
+            raise httpx.TimeoutException("mock timeout")
+        self._calls += 1
+        content = '{"ok": true, "task": "mock"}'
+        return LLMResponse(
+            content=content,
+            model=model or self.model,
+            usage=LLMUsage(prompt_tokens=len(user_message.split()), completion_tokens=len(content.split())),
+            duration_seconds=time.perf_counter() - started,
+        )
+
+
+def get_llm_provider(settings: Settings) -> BaseLLMProvider:
+    """Devuelve el proveedor configurado por env (`LLM_PROVIDER`)."""
+    if settings.llm_provider == "http":
+        return HTTPLLMProvider(
+            base_url=settings.llm_base_url,
+            api_key=settings.llm_api_key.get_secret_value(),
+            timeout_seconds=settings.llm_timeout_seconds,
+        )
+    return MockLLMProvider(model=settings.llm_model)
