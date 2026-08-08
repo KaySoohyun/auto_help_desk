@@ -1,0 +1,21 @@
+from fastapi import FastAPI
+
+from app.api.routes_auth import router as auth_router
+from app.core.config import settings
+from app.database import Base, engine
+
+app = FastAPI(title=settings.app_name)
+
+app.include_router(auth_router)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    import app.models  # noqa: F401
+
+    Base.metadata.create_all(bind=engine)
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
