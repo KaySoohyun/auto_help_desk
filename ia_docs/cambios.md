@@ -136,3 +136,15 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/main.py` — router de IA registrado.
 - Tests: `tests/test_llm.py` (13 tests: mock determinista, rate limit, retry→éxito, unavailable tras reintentos, auditoría, ping 401/200, info 401/403/200, ping auditado en DB).
 - Suite completa: **98 tests pasados** (incluye regresión de features 002-009).
+
+### Fase 4 · Clasificación automática de tickets — rama `feature/011-clasificacion`
+
+- Feature 011 creada en `ia_docs/features/011-clasificacion/`.
+- `app/models/ai_suggestion.py` — modelo `AISuggestion` (`ai_suggestions`): tenant_id, ticket_id (FK CASCADE), type (`classification|summary|reply`), output JSON (sin PII), confidence, model, prompt_version, state (`draft|accepted|rejected`), timestamps; índice compuesto `(tenant_id, ticket_id)`. Base para features 012/013 y feedback 015.
+- `app/core/config.py` — `ai_confidence_threshold` (0.6), catálogos `ai_classify_categories` y `ai_classify_intents`.
+- `app/prompts/classification.py` — prompt versionado `1.0.0` con separación instrucciones/datos (guardrail §12.1) y builders `build_classify_system`/`build_classify_user_prompt`.
+- `app/services/classifier.py` — `TicketClassifier.classify()`: redacta PII del contexto (asunto/descripción/historial con `PiiRedactor`), invoca orquestador (tarea `classify`), valida JSON estructurado (`ClassificationError` como fallback seguro), persiste `AISuggestion` draft, audita `ai.classified` sin PII y registra `ai_classifications_total`.
+- `app/schemas/ai.py` — `ClassificationOut` (contrato §15.1 + suggestionId + traceId).
+- `app/api/routes_ai.py` — `POST /v1/ai/tickets/{ticket_id}/classify` con `REQUEST_AI_SUGGESTION`; 404 otro tenant, 429 rate limit, 503 LLM caído, 422 JSON inválido.
+- Tests: `tests/test_classify.py` (8 tests: éxito con mock, baja confianza→warnings, otro tenant→404, 401, 503, 422, persistencia sin PII, auditoría+métricas; inyección del proveedor vía monkeypatch).
+- Suite completa: **106 tests pasados** (incluye regresión de features 002-010).

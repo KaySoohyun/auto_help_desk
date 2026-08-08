@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     llm_rate_max_calls: int = 60
     llm_rate_window_seconds: int = 60
 
+    ai_confidence_threshold: float = 0.6
+    ai_classify_categories: str = (
+        "billing,technical,account,general,urgent,feedback,other"
+    )
+    ai_classify_intents: str = "request,incident,question,complaint,other"
+
     @property
     def encryption_key(self) -> bytes:
         """Clave de cifrado de campos, derivada de SECRET_KEY (nunca persistida)."""
