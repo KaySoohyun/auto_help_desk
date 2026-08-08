@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.permissions import EDIT_RESPONSE, READ_TICKETS, SEND_RESPONSE, require_permissions
 from app.database import get_db
 from app.models.user import User
-from app.repositories.tickets import MessageView, TicketRepository, TicketView
+from app.repositories.tickets import MessageView, TicketRepository, TicketSummaryView, TicketView
 from app.schemas.ticket import (
     TicketCreate,
     TicketListOut,

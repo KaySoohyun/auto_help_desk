@@ -29,6 +29,22 @@ class TicketView:
 
 
 @dataclass
+class TicketSummaryView:
+    """Espejo resumido para listados: NO accede a `description` (columna diferida)."""
+
+    id: int
+    tenant_id: str
+    subject: str
+    category: str | None
+    priority: str | None
+    language: str
+    status: str
+    assignee_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
 class MessageView:
     """Espejo de un TicketMessage con el cuerpo descifrado (sin tocar el ORM)."""
 
@@ -57,6 +73,21 @@ class TicketRepository(TenantScopedRepository[Ticket]):
             return decrypt_field(value, settings.encryption_key)
         except InvalidCipherValue:
             return value
+
+    def _summary_view(self, ticket: Ticket) -> TicketSummaryView:
+        # No accede a `description` (columna diferida) para no disparar lazy load en listados.
+        return TicketSummaryView(
+            id=ticket.id,
+            tenant_id=ticket.tenant_id,
+            subject=self._decrypt(ticket.subject),
+            category=ticket.category,
+            priority=ticket.priority,
+            language=ticket.language,
+            status=ticket.status,
+            assignee_id=ticket.assignee_id,
+            created_at=ticket.created_at,
+            updated_at=ticket.updated_at,
+        )
 
     def _view(self, ticket: Ticket) -> TicketView:
         return TicketView(
@@ -115,7 +146,7 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         date_to: datetime | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> tuple[list[TicketView], int]:
+    ) -> tuple[list[TicketSummaryView], int]:
         filters = [Ticket.tenant_id == self.tenant_id]
         if status:
             filters.append(Ticket.status == status)
@@ -139,7 +170,7 @@ class TicketRepository(TenantScopedRepository[Ticket]):
             .offset(offset)
         )
         tickets = list(self.db.scalars(stmt).all())
-        return [self._view(t) for t in tickets], total
+        return [self._summary_view(t) for t in tickets], total
 
     def update(self, pk, changes: dict[str, Any]) -> TicketView | None:
         ticket = super().get_or_none(pk)

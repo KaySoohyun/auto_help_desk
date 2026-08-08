@@ -74,6 +74,7 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - Tests: `tests/test_audit.py` (auditoría de auth, sin PII, aislamiento por tenant, permisos, append-only).
 - Suite completa: 39 tests pasados (incluye regresión de features 002-004).
 - Commit `14011a1` en `feature/005-auditoria`; merge a `develop` (commit `8d27183`).
+- Commit `14011a1` en `feature/005-auditoria`; merge a `develop` (commit `8d27183`).
 
 ### Fase 3 · API core de tickets — rama `feature/006-tickets`
 
@@ -97,3 +98,16 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/main.py` — router de PII registrado.
 - Tests: `tests/test_pii.py` (15 tests: detección por tipo, múltiples ocurrencias, tokens sin fuga, modos, Luhn, auditoría sin PII, 401).
 - Suite completa: **68 tests pasados** (incluye regresión de features 002-006).
+- Commit `717258d` en `feature/007-pii`; merge a `develop` (commit `77fbd89`).
+
+### Fase 3 · Optimización de consultas y rendimiento — rama `feature/008-rendimiento`
+
+- Feature 008 creada en `ia_docs/features/008-rendimiento/`.
+- `app/models/ticket.py` — índices compuestos `ix_tickets_tenant_status`, `ix_tickets_tenant_created`, `ix_tickets_tenant_priority`; `description` marcada como columna diferida (`deferred=True`). `TicketMessage`: índice `ix_messages_ticket_created` y `body` diferida.
+- `app/models/audit.py` — índice compuesto `ix_audit_tenant_created`.
+- `app/repositories/tickets.py` — nueva vista `TicketSummaryView` para listados que NO accede a la columna diferida (evita N+1); `list()` la usa.
+- `app/schemas/ticket.py` — `TicketSummaryOut` (sin `description`); `TicketListOut.items` lo usa.
+- `app/api/routes_tickets.py` — el listado devuelve el resumen; el detalle sigue con `description`.
+- Tests: `tests/test_schema.py` (8 tests: índices en metadata y recreados, deferred de `description`/`body`, listado sin exposición de PII, detalle intacto, sin N+1).
+- `tests/test_tickets.py` — ajustado el test de cifrado en reposo para leer dentro de la sesión (compatibilidad con deferred).
+- Suite completa: **76 tests pasados** (incluye regresión de features 002-007).

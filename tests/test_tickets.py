@@ -155,15 +155,21 @@ def test_sensitive_fields_are_encrypted_at_rest(client: TestClient) -> None:
     with SessionLocal() as db:
         raw_ticket = db.get(Ticket, created["id"])
         raw_message = db.query(TicketMessage).filter(TicketMessage.ticket_id == created["id"]).first()
+        assert raw_ticket is not None
+        assert raw_message is not None
+        raw_subject = raw_ticket.subject
+        raw_description = raw_ticket.description
+        raw_body = raw_message.body
 
-    assert raw_ticket is not None
-    assert raw_message is not None
-    assert "facturación" not in raw_ticket.subject
-    assert "factura del mes" not in raw_ticket.description
-    assert "secreto del cliente" not in raw_message.body
-    assert raw_ticket.subject.startswith("cipher:")
-    assert raw_ticket.description.startswith("cipher:")
-    assert raw_message.body.startswith("cipher:")
+    assert raw_subject
+    assert raw_description
+    assert raw_body
+    assert "facturación" not in raw_subject
+    assert "factura del mes" not in raw_description
+    assert "secreto del cliente" not in raw_body
+    assert raw_subject.startswith("cipher:")
+    assert raw_description.startswith("cipher:")
+    assert raw_body.startswith("cipher:")
 
 
 def test_ticket_operations_are_audited(client: TestClient) -> None:
