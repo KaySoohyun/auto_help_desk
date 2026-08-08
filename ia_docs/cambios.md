@@ -123,3 +123,16 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/main.py` — middleware y router de métricas registrados.
 - Tests: `tests/test_metrics.py` (9 tests: 401/403/200, contadores/histogramas con requests reales, errores 404, métricas de negocio create/close, no-PII, formato Prometheus, reset).
 - Suite completa: **85 tests pasados** (incluye regresión de features 002-008).
+
+### Fase 4 · Orquestador LLM y conectores de IA — rama `feature/010-orquestador-llm`
+
+- Feature 010 creada en `ia_docs/features/010-orquestador-llm/`.
+- `app/services/llm.py` — conectores: `LLMUsage`, `LLMResponse`, `LLMUnavailableError` (fallback seguro) y `LLMRateLimitExceeded`; `HTTPLLMProvider` (httpx, OpenAI Chat Completions, timeout) y `MockLLMProvider` (determinista, dev/tests sin red); fábrica `get_llm_provider` según env.
+- `app/core/config.py` — settings LLM (`llm_provider`, `llm_base_url`, `llm_api_key` SecretStr, model, timeout, retries, backoff, max_tokens, rate limit por ventana).
+- `app/core/rate_limit.py` — `RateLimitStore` en memoria (ventana deslizante, thread-safe; sin Redis en el stack).
+- `app/services/llm_orchestrator.py` — `LLMOrchestrator.complete()`: rate limit `tenant_id:user_id`, reintentos con backoff ante timeout/connect/5xx, métricas (`llm_calls_total{task,status}`, `llm_latency_seconds`, `llm_tokens_total`) reutilizando 009, y auditoría `llm.call` (sin prompts ni respuestas).
+- `app/api/routes_ai.py` — `POST /v1/ai/ping` (REQUEST_AI_SUGGESTION; 429 por rate limit, 503 si LLM caído) y `GET /v1/ai/info` (VIEW_AUDIT, config sin secretos).
+- `app/schemas/llm.py` — `LLMPingInfo`.
+- `app/main.py` — router de IA registrado.
+- Tests: `tests/test_llm.py` (13 tests: mock determinista, rate limit, retry→éxito, unavailable tras reintentos, auditoría, ping 401/200, info 401/403/200, ping auditado en DB).
+- Suite completa: **98 tests pasados** (incluye regresión de features 002-009).

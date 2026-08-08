@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.routes_admin import router as admin_router
+from app.api.routes_ai import router as ai_router
 from app.api.routes_audit import router as audit_router
 from app.api.routes_auth import router as auth_router
 from app.api.routes_metrics import router as metrics_router
@@ -20,6 +21,7 @@ app.include_router(audit_router)
 app.include_router(tickets_router)
 app.include_router(pii_router)
 app.include_router(metrics_router)
+app.include_router(ai_router)
 
 
 @app.on_event("startup")

@@ -13,12 +13,13 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 7. **007 · Redacción de PII** — motor de detección/redacción de datos sensibles (email, teléfono, tarjetas, DNIs, fechas, IPs, URLs internas) con tokens seguros, modos off/detect/redact y auditoría sin valores originales.
 8. **008 · Optimización de consultas** — índices compuestos (tenant+status/created/priority, ticket+created, audit+created), campos diferidos para PII pesada (listados sin `description`/`body`) y paginación con límites.
 9. **009 · Observabilidad del backend** — registro de métricas en memoria (contadores, gauge e histogramas), middleware de latencia/errores/excepciones con `trace_id`, `GET /v1/metrics` en formato texto Prometheus protegido con `VIEW_AUDIT`, y métricas de negocio de tickets por tenant (sin PII). Sin dependencias externas.
+10. **010 · Orquestador LLM y conectores de IA** — punto único de llamadas LLM (ADR-002): proveedores HTTP (httpx, OpenAI-compatible) y mock, timeout/reintentos con backoff, rate limit en memoria por tenant+usuario, fallback seguro (`LLMUnavailableError`), métricas de tokens/latencia/errores (feature 009) y auditoría `llm.call` sin prompts. Expone `POST /v1/ai/ping` y `GET /v1/ai/info`.
 
 ## Siguiente 🔜
 
 _Lo próximo a abordar: Fase 4 (Integración API IA), una feature en curso a la vez._
 
-10. **010 · Orquestador LLM y conectores de IA** — gateway con timeouts, reintentos, fallback y límites de uso.
+11. **011 · Clasificación automática de tickets** — categoría, subcategoría, intención y prioridad sugerida con confianza.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
