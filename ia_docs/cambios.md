@@ -148,3 +148,13 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/api/routes_ai.py` — `POST /v1/ai/tickets/{ticket_id}/classify` con `REQUEST_AI_SUGGESTION`; 404 otro tenant, 429 rate limit, 503 LLM caído, 422 JSON inválido.
 - Tests: `tests/test_classify.py` (8 tests: éxito con mock, baja confianza→warnings, otro tenant→404, 401, 503, 422, persistencia sin PII, auditoría+métricas; inyección del proveedor vía monkeypatch).
 - Suite completa: **106 tests pasados** (incluye regresión de features 002-010).
+
+### Fase 4 · Resumen automático de tickets — rama `feature/012-resumen`
+
+- Feature 012 creada en `ia_docs/features/012-resumen/`.
+- `app/prompts/summary.py` — prompt versionado `1.0.0` con separación instrucciones/datos (guardrail §12.1) y builders `build_summary_system`/`build_summary_user_prompt`.
+- `app/services/summarizer.py` — `TicketSummarizer.summarize()`: contexto redactado de PII (asunto/descripción/historial), orquestador (tarea `summary`), validación JSON (`SummaryError` como fallback), persistencia `AISuggestion(type='summary')` draft, auditoría `ai.summarized` sin PII y métrica `ai_summaries_total`.
+- `app/schemas/ai.py` — `SummaryOut` (contrato §15.2 + suggestionId + traceId).
+- `app/api/routes_ai.py` — `POST /v1/ai/tickets/{ticket_id}/summary` con `REQUEST_AI_SUGGESTION`; 404 otro tenant, 429, 503, 422.
+- Tests: `tests/test_summary.py` (8 tests: éxito con mock, baja confianza→warnings, otro tenant→404, 401, 503, 422, persistencia sin PII, auditoría+métricas).
+- Suite completa: **114 tests pasados** (incluye regresión de features 002-011).

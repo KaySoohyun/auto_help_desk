@@ -6,12 +6,13 @@ from app.core.deps import get_trace_id
 from app.core.permissions import REQUEST_AI_SUGGESTION, VIEW_AUDIT, require_permissions
 from app.database import get_db
 from app.models.user import User
-from app.schemas.ai import ClassificationOut
+from app.schemas.ai import ClassificationOut, SummaryOut
 from app.schemas.llm import LLMPingInfo
 from app.services.audit import AuditService, get_audit_service
 from app.services.classifier import ClassificationError, TicketClassifier
 from app.services.llm import LLMRateLimitExceeded, LLMUnavailableError
 from app.services.llm_orchestrator import LLMOrchestrator
+from app.services.summarizer import SummaryError, TicketSummarizer
 
 router = APIRouter(prefix="/v1/ai", tags=["ai"])
 
@@ -99,6 +100,44 @@ def classify_ticket(
         suggested_priority=result.suggested_priority,
         confidence=result.confidence,
         rationale=result.rationale,
+        warnings=result.warnings,
+        suggestion_id=suggestion.id,
+        trace_id=trace_id,
+    )
+
+
+@router.post("/tickets/{ticket_id}/summary", response_model=SummaryOut)
+def summarize_ticket(
+    ticket_id: int,
+    current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_trace),
+) -> SummaryOut:
+    """Resume un ticket con IA (spec §15.2). El contexto va redactado de PII."""
+    summarizer = TicketSummarizer(
+        db,
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id,
+        orchestrator=_orchestrator(audit),
+        audit=audit,
+    )
+    try:
+        result, suggestion = summarizer.summarize(ticket_id, trace_id=trace_id)
+    except LLMRateLimitExceeded as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    except LLMUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="LLM no disponible"
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
+    except SummaryError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return SummaryOut(
+        summary=result.summary,
+        missing_information=result.missing_information,
+        confidence=result.confidence,
         warnings=result.warnings,
         suggestion_id=suggestion.id,
         trace_id=trace_id,
