@@ -10,16 +10,16 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 4. **004 · Cifrado, secretos y protección de datos** — cifrado AES-GCM de campos (formato versionado, anti-tamper), validación de `SECRET_KEY` y plan de secretos (Vault).
 5. **005 · Auditoría, logging y trazabilidad** — modelo `AuditEvent` append-only, `AuditService`, eventos de auth auditados, endpoint `GET /audit/events` protegido y paginado.
 6. **006 · API core de tickets** — creación, consulta, listado con filtros/paginación, actualización, mensajes y cierre, con cifrado en reposo de campos sensibles y aislamiento por tenant.
+7. **007 · Redacción de PII** — motor de detección/redacción de datos sensibles (email, teléfono, tarjetas, DNIs, fechas, IPs, URLs internas) con tokens seguros, modos off/detect/redact y auditoría sin valores originales.
 
 ## Siguiente 🔜
 
 _Lo próximo a abordar: Fase 3 (Backend / Almacenamiento Cloud), una feature en curso a la vez._
 
-7. **007 · Redacción de PII** — detección y enmascaramiento de campos sensibles antes de cualquier uso externo.
+8. **008 · Optimización de consultas y rendimiento** — índices, paginación, caché y proyecciones ligeras.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
-7. **007 · Redacción de PII** — detección y enmascaramiento de campos sensibles antes de cualquier uso externo.
 8. **008 · Optimización de consultas y rendimiento** — índices, paginación, caché y proyecciones ligeras.
 9. **009 · Observabilidad del backend** — métricas, trazas y alertas.
 

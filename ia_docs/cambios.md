@@ -86,3 +86,14 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/main.py` — router de tickets registrado.
 - Tests: `tests/test_tickets.py` (14 tests: CRUD, mensajes, cierre, cifrado en reposo, aislamiento 404, auditoría).
 - Suite completa: **53 tests pasados** (incluye regresión de features 002-005).
+- Commit `497c5a1` en `feature/006-tickets`; merge a `develop` (commit `e5c723c`).
+
+### Fase 3 · Redacción de PII — rama `feature/007-pii`
+
+- Feature 007 creada en `ia_docs/features/007-pii/`.
+- `app/services/pii.py` — `PIIRedactor`: detección no-solapada de tipos PII (email, teléfono, tarjeta con Luhn, DNI/NIE, passport, fecha nacimiento, IP, URL interna) y reemplazo por tokens `[[PII:TIPO:hash8]]` con salt por request; modos `off|detect|redact`; tarjeta con Luhn inválido no se redacta.
+- `app/schemas/pii.py` — schemas `PIIRedactRequest`, `PIIRedactResponse`, `PIIReportOut` (sin valores en claro).
+- `app/api/routes_pii.py` — `POST /v1/pii/redact` protegido con `REQUEST_AI_SUGGESTION`; audita `pii.redacted` sin texto original.
+- `app/main.py` — router de PII registrado.
+- Tests: `tests/test_pii.py` (15 tests: detección por tipo, múltiples ocurrencias, tokens sin fuga, modos, Luhn, auditoría sin PII, 401).
+- Suite completa: **68 tests pasados** (incluye regresión de features 002-006).
