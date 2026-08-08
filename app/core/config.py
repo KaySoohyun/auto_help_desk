@@ -17,5 +17,10 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./app.db"
 
+    @property
+    def encryption_key(self) -> bytes:
+        """Clave de cifrado de campos, derivada de SECRET_KEY (nunca persistida)."""
+        return self.secret_key.encode("utf-8")
+
 
 settings = Settings()

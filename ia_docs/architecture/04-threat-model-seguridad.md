@@ -90,3 +90,23 @@
 - SAST/DAST y revisión de dependencias.
 - Revisión de firmas JWT (iss, aud, exp, scope) y rotación de secretos.
 - Pruebas de cifrado en tránsito (TLS) y en reposo.
+
+## 6. Cifrado y protección de datos (spec §10.4, §10.5)
+
+### 6.1 Cifrado en reposo de campos
+
+- Implementado en `app/core/crypto.py` (feature 004): AES-GCM con clave derivada por HKDF desde `SECRET_KEY`.
+- Formato versionado `cipher:<versión>:<salt>:<nonce>:<ct>:<tag>`: cualquier manipulación del dato rompe la autenticación GCM y se rechaza.
+- Uso: cifrado selectivo de campos PII críticos (p. ej. descripción de ticket, cuerpo de mensajes) antes de persistir.
+- Rotación: cambiar `SECRET_KEY` requiere re-cifrado de los datos con clave anterior (plan de migración) — el versionado permite identificar tokens antiguos.
+
+### 6.2 Cifrado en tránsito
+
+- TLS obligatorio en todos los entornos expuestos (spec §10.5). En desarrollo local no se habilita; en despliegue cloud se termina TLS en el gateway/load balancer.
+- No exponer la API sin TLS fuera de localhost; redirigir HTTP → HTTPS en el borde.
+
+### 6.3 Gestión de secretos (spec §10.4)
+
+- MVP: secretos viven en `.env` (nunca versionado) leídos por `pydantic-settings`; `SECRET_KEY` validada con longitud mínima ≥32 (falla el arranque si es corta).
+- Plan de migración: mover claves a un vault (HashiCorp Vault / cloud KMS / SSM) con rotación automática; la app lee por interfaz de config, por lo que el cambio no toca el código.
+- Reglas: no loggear secretos, no exponer API keys de LLM en frontend, mínimos privilegios por entorno.

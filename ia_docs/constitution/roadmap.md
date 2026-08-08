@@ -7,12 +7,12 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 1. **001 · Fundamentos y arquitectura** — base del repo, configuración `.env`, ADRs y backlog priorizado (Fase 1). Entregables en `ia_docs/architecture/`.
 2. **002 · Autenticación JWT/OAuth** — login, refresh rotativo, logout con revocación, validación de tokens (exp, iss, aud, roles) y hash argon2.
 3. **003 · Autorización por tenant y RBAC** — catálogo de permisos por rol, `require_roles`/`require_permissions`, repositorio con filtro por tenant (ADR-001) y tests de aislamiento multi-tenant.
+4. **004 · Cifrado, secretos y protección de datos** — cifrado AES-GCM de campos (formato versionado, anti-tamper), validación de `SECRET_KEY` y plan de secretos (Vault).
 
 ## Siguiente 🔜
 
 _Lo próximo a abordar: Fase 2 (Fundamentos de Plataforma, Identidad y Seguridad), una feature en curso a la vez._
 
-4. **004 · Cifrado, secretos y protección de datos** — TLS en tránsito, cifrado en reposo, vault para claves.
 5. **005 · Auditoría, logging y trazabilidad** — eventos de acceso, acciones de agentes y actividad de IA.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
