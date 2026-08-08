@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.permissions import EDIT_RESPONSE, READ_TICKETS, SEND_RESPONSE, require_permissions
+from app.core.metrics import metrics
 from app.database import get_db
 from app.models.user import User
 from app.repositories.tickets import MessageView, TicketRepository, TicketSummaryView, TicketView
@@ -84,6 +85,7 @@ def create_ticket(
         priority=payload.priority,
         language=payload.language,
     )
+    metrics.inc("tickets_created_total", labels={"tenant_id": current_user.tenant_id or ""})
     _audit(audit, current_user, "ticket.created", ticket.id, trace_id)
     return ticket
 
@@ -189,5 +191,6 @@ def close_ticket(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
     if ticket is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado")
+    metrics.inc("tickets_closed_total", labels={"tenant_id": current_user.tenant_id or ""})
     _audit(audit, current_user, "ticket.closed", ticket_id, trace_id)
     return ticket
