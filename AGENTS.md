@@ -21,6 +21,7 @@ Actúa como un ingeniero backend senior especializado en Python, FastAPI, seguri
 - Prioriza seguridad: validación de tokens, expiración, scopes y revocación.
 - Antes de dar por terminada una tarea, sugiere cómo probarla.
 - Documentar todos los cambios en `ia_docs/cambios.md`
+- No mergear a main/master sin pedir permiso
 
 ## Estilo
 
