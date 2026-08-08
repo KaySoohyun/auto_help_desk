@@ -12,7 +12,7 @@ class AISuggestion(Base):
     Una única tabla para todos los tipos de sugerencia (classification | summary |
     reply). `output` guarda la salida estructurada SIN PII cruda (el texto de
     entrada nunca se persiste aquí). `state` refleja el ciclo draft → accepted /
-    rejected (feedback en feature 015).
+    edited / rejected / flagged (feedback en feature 015).
     """
 
     __tablename__ = "ai_suggestions"
@@ -26,7 +26,7 @@ class AISuggestion(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     prompt_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    state: Mapped[str] = mapped_column(String(20), default="draft")  # draft | accepted | rejected
+    state: Mapped[str] = mapped_column(String(20), default="draft")  # draft | accepted | edited | rejected | flagged
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)

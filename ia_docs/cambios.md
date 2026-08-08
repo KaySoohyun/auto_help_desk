@@ -178,3 +178,18 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/api/routes_ai.py` — `OutputBlockedError` mapeado a 422 "Contenido bloqueado por política de seguridad" (spec §13.4) en classify/summary/suggested-reply/ping.
 - Tests: `tests/test_guardrails.py` (11 tests: unitarios check_output/check_input, bloqueo por PII/jailbreak en salida, salida limpia pasa, auditoría+métricas del bloqueo, alerta de entrada auditada sin bloquear, `guardrails_enabled=False`).
 - Suite completa: **134 tests pasados** (incluye regresión de features 002-013).
+
+### Fase 5 · Workspace de agente — rama `feat/15-workspace-agente`
+
+- Feature 015 creada en `ia_docs/features/015-workspace-agente/`.
+- `app/models/feedback.py` — modelo `Feedback` (`feedback`): `suggestion_id` FK único a `ai_suggestions` (ondelete CASCADE), `tenant_id`, `action` (accepted|edited|rejected|flagged), `reason`, `edited_content_hash`, timestamps; índice `(tenant_id, suggestion_id)`.
+- `app/models/ai_suggestion.py` — `state` ampliado a `draft | accepted | edited | rejected | flagged` (FR-09).
+- `app/schemas/ai.py` — `FeedbackIn` (suggestion_id, action Literal, reason?, edited_content_hash?), `FeedbackOut`, `SuggestionOut` (id, type, state, confidence, model, prompt_version, output, created_at).
+- `app/services/feedback.py` — `FeedbackService.record()`: valida que la sugerencia sea del tenant (otro tenant → `PermissionError`), upsert de feedback por `suggestion_id`, actualiza `AISuggestion.state`, audita `ai.feedback` (sin reason ni PII) y métrica `ai_feedback_total{action}`.
+- `app/api/routes_workspace.py` — router `v1`:
+  - `POST /v1/ai/tickets/{ticket_id}/feedback` (`EDIT_RESPONSE`): 404 ticket/sugerencia de otro tenant o inexistente; 422 action inválido.
+  - `GET /v1/ai/tickets/{ticket_id}/suggestions` (`READ_TICKETS`): lista sugerencias del ticket del tenant (sin PII).
+  - `GET /v1/workspace/my-tickets` (`READ_TICKETS`): bandeja del agente (tickets asignados a él), paginado, `TicketSummaryView`.
+- `app/main.py` — router workspace registrado.
+- Tests: `tests/test_workspace.py` (10 tests: feedback por acción actualiza state, 404 otro tenant/sugerencia inexistente, 422 action, listado de sugerencias con aislamiento por tenant, bandeja solo mis tickets, auditoría `ai.feedback` y métrica `ai_feedback_total`, 401).
+- Suite completa: **144 tests pasados** (incluye regresión de features 002-014).
