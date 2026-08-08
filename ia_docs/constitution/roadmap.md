@@ -1,0 +1,53 @@
+# Roadmap
+
+_Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora y qué viene". Cada entrada apunta a su carpeta en `features/`. Las fases 1-6 referencian `ia_docs/plan-ejecucion.md`._
+
+## Fase 1: Descubrimiento / Diseño 🎨
+
+_Entregables: catálogo de casos de uso, matriz de requisitos, diagrama de arquitectura cloud multi-tenant, modelo de datos con clasificación de PII, threat model JWT/OAuth + tenant + auditoría, política de redacción/retención, estrategia de prompts y ADRs._
+
+1. **001 · Fundamentos y arquitectura** — base del repo, configuración `.env`, ADRs y backlog priorizado (Fase 1).
+
+## Fase 2: Fundamentos de Plataforma, Identidad y Seguridad 🔐
+
+2. **002 · Autenticación JWT/OAuth** — login, validación de tokens, expiración, scopes y revocación.
+3. **003 · Autorización por tenant y RBAC** — middleware de aislamiento por tenant y validación de roles (agente, supervisor, admin de tenant, admin de plataforma, servicio IA).
+4. **004 · Cifrado, secretos y protección de datos** — TLS en tránsito, cifrado en reposo, vault para claves.
+5. **005 · Auditoría, logging y trazabilidad** — eventos de acceso, acciones de agentes y actividad de IA.
+
+## Fase 3: Backend / Almacenamiento Cloud 💾
+
+6. **006 · API core de tickets** — creación, consulta, actualización, asignación y cierre con aislamiento por tenant.
+7. **007 · Redacción de PII** — detección y enmascaramiento de campos sensibles antes de cualquier uso externo.
+8. **008 · Optimización de consultas y rendimiento** — índices, paginación, caché y proyecciones ligeras.
+9. **009 · Observabilidad del backend** — métricas, trazas y alertas.
+
+## Fase 4: Integración API IA 🤖
+
+10. **010 · Orquestador LLM y conectores de IA** — gateway con timeouts, reintentos, fallback y límites de uso.
+11. **011 · Clasificación automática de tickets** — categoría, subcategoría, intención y prioridad sugerida con confianza.
+12. **012 · Resumen automático de tickets** — problema principal, acciones previas, estado actual e información faltante.
+13. **013 · Sugerencia de respuesta editable** — borrador con grounding y fuentes.
+14. **014 · Guardrails de IA** — prompt injection, control de alucinaciones, validación de salida y fallback seguro.
+
+## Fase 5: Experiencia de Agente y Administración 🖥️
+
+15. **015 · Workspace de agente** — gestión de tickets, colas y panel de asistencia IA (aceptar/editar/rechazar/escalar).
+16. **016 · Administración de tenants y auditoría** — usuarios, roles, permisos, políticas IA y vistas de auditoría.
+
+## Fase 6: Testing / Despliegue 🚀
+
+17. **017 · Pruebas y red teaming** — funcionales, seguridad/privacidad multi-tenancy, rendimiento y evaluación de IA.
+18. **018 · CI/CD y operación** — pipelines, rollout por tenants, feature flags, dashboards, runbooks y release a producción.
+
+## Backlog / ideas 💡
+
+_Sin comprometer ni ordenar del todo. Ideas que respetan la constitución._
+
+- **Base de conocimiento por tenant (RAG avanzado)** — artículos aprobados con filtro por idioma y vigencia.
+- **Métricas de calidad y uso** — precisión de clasificación, tasas de aceptación/rechazo y evaluación con dataset de control.
+- **Detección proactiva de tickets duplicados** — sugerir próximos mejores acciones.
+- **Analítica de calidad por agente y por equipo.**
+- **Soporte multi-idioma completo.**
+
+> Cada feature nueva se crea como `features/NNN-nombre-feature/` con `spec.md`, `plan.md` y `tasks.md` antes de tocar código.
