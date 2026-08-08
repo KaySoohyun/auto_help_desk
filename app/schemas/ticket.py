@@ -48,8 +48,23 @@ class TicketOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TicketSummaryOut(BaseModel):
+    id: int
+    tenant_id: str
+    subject: str
+    category: str | None
+    priority: str | None
+    language: str
+    status: str
+    assignee_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class TicketListOut(BaseModel):
-    items: list[TicketOut]
+    items: list[TicketSummaryOut]
     total: int
     limit: int
     offset: int

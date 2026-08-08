@@ -11,16 +11,18 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 5. **005 · Auditoría, logging y trazabilidad** — modelo `AuditEvent` append-only, `AuditService`, eventos de auth auditados, endpoint `GET /audit/events` protegido y paginado.
 6. **006 · API core de tickets** — creación, consulta, listado con filtros/paginación, actualización, mensajes y cierre, con cifrado en reposo de campos sensibles y aislamiento por tenant.
 7. **007 · Redacción de PII** — motor de detección/redacción de datos sensibles (email, teléfono, tarjetas, DNIs, fechas, IPs, URLs internas) con tokens seguros, modos off/detect/redact y auditoría sin valores originales.
+8. **008 · Optimización de consultas** — índices compuestos (tenant+status/created/priority, ticket+created, audit+created), campos diferidos para PII pesada (listados sin `description`/`body`) y paginación con límites.
 
 ## Siguiente 🔜
 
 _Lo próximo a abordar: Fase 3 (Backend / Almacenamiento Cloud), una feature en curso a la vez._
 
+9. **009 · Observabilidad del backend** — métricas, trazas y alertas.
+
 8. **008 · Optimización de consultas y rendimiento** — índices, paginación, caché y proyecciones ligeras.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
-8. **008 · Optimización de consultas y rendimiento** — índices, paginación, caché y proyecciones ligeras.
 9. **009 · Observabilidad del backend** — métricas, trazas y alertas.
 
 ## Fase 4: Integración API IA 🤖
