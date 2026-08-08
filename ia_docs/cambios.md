@@ -111,3 +111,15 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - Tests: `tests/test_schema.py` (8 tests: índices en metadata y recreados, deferred de `description`/`body`, listado sin exposición de PII, detalle intacto, sin N+1).
 - `tests/test_tickets.py` — ajustado el test de cifrado en reposo para leer dentro de la sesión (compatibilidad con deferred).
 - Suite completa: **76 tests pasados** (incluye regresión de features 002-007).
+
+### Fase 3 · Observabilidad del backend — rama `feature/009-observabilidad`
+
+- Feature 009 creada en `ia_docs/features/009-observabilidad/`.
+- `app/core/metrics.py` — `MetricsRegistry` en memoria (counter, gauge, histograma con buckets Prometheus) sin dependencias externas; serialización a formato de texto Prometheus (`render_prometheus()`); instancia global `metrics` con `reset()` para tests.
+- `app/core/logging.py` — logger de aplicación con filtro de `trace_id` (ContextVar `trace_id_var`), idempotente; sin PII.
+- `app/core/observability.py` — `MetricsMiddleware` (BaseHTTPMiddleware): `http_requests_total{method,route,status}`, `http_request_duration_seconds` (histograma), `http_errors_total{status}` (≥400), `http_exceptions_total`; header `X-Request-ID` con el `trace_id`.
+- `app/api/routes_metrics.py` — `GET /v1/metrics` (text/plain, formato Prometheus) protegido con `VIEW_AUDIT` (permiso existente en el catálogo RBAC; no se añadió `VIEW_METRICS`).
+- `app/api/routes_tickets.py` — métricas de negocio: `tickets_created_total` y `tickets_closed_total` con label `tenant_id`.
+- `app/main.py` — middleware y router de métricas registrados.
+- Tests: `tests/test_metrics.py` (9 tests: 401/403/200, contadores/histogramas con requests reales, errores 404, métricas de negocio create/close, no-PII, formato Prometheus, reset).
+- Suite completa: **85 tests pasados** (incluye regresión de features 002-008).

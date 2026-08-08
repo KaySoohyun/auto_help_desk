@@ -12,18 +12,17 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 6. **006 · API core de tickets** — creación, consulta, listado con filtros/paginación, actualización, mensajes y cierre, con cifrado en reposo de campos sensibles y aislamiento por tenant.
 7. **007 · Redacción de PII** — motor de detección/redacción de datos sensibles (email, teléfono, tarjetas, DNIs, fechas, IPs, URLs internas) con tokens seguros, modos off/detect/redact y auditoría sin valores originales.
 8. **008 · Optimización de consultas** — índices compuestos (tenant+status/created/priority, ticket+created, audit+created), campos diferidos para PII pesada (listados sin `description`/`body`) y paginación con límites.
+9. **009 · Observabilidad del backend** — registro de métricas en memoria (contadores, gauge e histogramas), middleware de latencia/errores/excepciones con `trace_id`, `GET /v1/metrics` en formato texto Prometheus protegido con `VIEW_AUDIT`, y métricas de negocio de tickets por tenant (sin PII). Sin dependencias externas.
 
 ## Siguiente 🔜
 
-_Lo próximo a abordar: Fase 3 (Backend / Almacenamiento Cloud), una feature en curso a la vez._
+_Lo próximo a abordar: Fase 4 (Integración API IA), una feature en curso a la vez._
 
-9. **009 · Observabilidad del backend** — métricas, trazas y alertas.
-
-8. **008 · Optimización de consultas y rendimiento** — índices, paginación, caché y proyecciones ligeras.
+10. **010 · Orquestador LLM y conectores de IA** — gateway con timeouts, reintentos, fallback y límites de uso.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
-9. **009 · Observabilidad del backend** — métricas, trazas y alertas.
+_Completada (features 006-009)._
 
 ## Fase 4: Integración API IA 🤖
 
