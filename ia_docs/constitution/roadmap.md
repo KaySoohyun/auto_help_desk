@@ -19,12 +19,13 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 13. **013 · Sugerencia de respuesta editable** — `TicketReplySuggester` con el mismo pipeline seguro: contexto redactado, tarea `reply`, borrador editable con grounding y fuentes (FR-08), `policyFlags` para aspectos no verificables, persistencia en `ai_suggestions` (draft) y umbral de confianza. `POST /v1/ai/tickets/{id}/suggested-reply`.
 14. **014 · Guardrails de IA** — capa de guardrails en el orquestador (ADR-002): filtro de salida (PII cruda + contenido prohibido/jailbreak) que bloquea y audita `ai_guardrail_blocks_total` con 422 "Contenido bloqueado por política de seguridad", y alerta de prompt injection en entrada (audita sin bloquear).
 15. **015 · Workspace de agente** — feedback del agente sobre sugerencias IA (`POST /v1/ai/tickets/{id}/feedback` con accepted/edited/rejected/flagged que actualiza el estado de la `AISuggestion`), panel IA por ticket (`GET /v1/ai/tickets/{id}/suggestions`) y bandeja del agente (`GET /v1/workspace/my-tickets`). Regenerar/escalar reutilizan endpoints existentes.
+16. **016 · Administración de tenants y auditoría** — gestión de usuarios por tenant (crear/actualizar rol/activo, paginación), políticas IA por tenant (`TenantPolicy`, FR-06), políticas globales de IA (overrides de `.env`, solo `MANAGE_AI_POLICIES`) y vistas de auditoría con filtros (action/service/user_id/result/fechas) que auditan el propio acceso (`audit.view`).
 
 ## Siguiente 🔜
 
-_Lo próximo a abordar: Fase 5 (Experiencia de Agente y Administración), una feature en curso a la vez._
+_Lo próximo a abordar: Fase 6 (Testing / Despliegue), una feature en curso a la vez._
 
-16. **016 · Administración de tenants y auditoría** — usuarios, roles, permisos, políticas IA y vistas de auditoría.
+17. **017 · Pruebas y red teaming** — funcionales, seguridad/privacidad multi-tenancy, rendimiento y evaluación de IA.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
@@ -41,6 +42,8 @@ _Completada (features 010-014)._
 14. **014 · Guardrails de IA** — prompt injection, control de alucinaciones, validación de salida y fallback seguro.
 
 ## Fase 5: Experiencia de Agente y Administración 🖥️
+
+_Completada (features 015-016)._
 
 15. **015 · Workspace de agente** — gestión de tickets, colas y panel de asistencia IA (aceptar/editar/rechazar/escalar).
 16. **016 · Administración de tenants y auditoría** — usuarios, roles, permisos, políticas IA y vistas de auditoría.

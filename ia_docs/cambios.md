@@ -193,3 +193,14 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/main.py` — router workspace registrado.
 - Tests: `tests/test_workspace.py` (10 tests: feedback por acción actualiza state, 404 otro tenant/sugerencia inexistente, 422 action, listado de sugerencias con aislamiento por tenant, bandeja solo mis tickets, auditoría `ai.feedback` y métrica `ai_feedback_total`, 401).
 - Suite completa: **144 tests pasados** (incluye regresión de features 002-014).
+
+### Fase 5 · Administración de tenants y auditoría — rama `feat/16-administracion-auditoria`
+
+- Feature 016 creada en `ia_docs/features/016-administracion-auditoria/` (spec §4.3/§4.4, FR-06, §11).
+- `app/models/policy.py` — `TenantPolicy` (`tenant_policies`): `tenant_id` único, `ai_enabled`, `tone`, `language`, `allowed_categories` (JSON), `escalation_rules` (JSON), timestamps. `GlobalPolicy` (`global_policies`): fila única (id=1) con overrides de modelo/umbral/guardrails/rate; nulos = default de `.env`. Registrados en `app/models/__init__.py`.
+- `app/schemas/admin.py` — `UserCreate`, `UserUpdate` (al menos role o is_active), `TenantPolicyIn/Out`, `GlobalPolicyIn/Out`.
+- `app/services/admin.py` — `AdminService`: `create_user` (tenant_admin solo su tenant y sin crear `platform_admin`; platform_admin en cualquier tenant con tenant_id obligatorio; 409 email duplicado; 422 sin tenant_id), `update_user` (404 inexistente/otro tenant, 403 auto-desactivación y rol fuera de alcance), `get/save_tenant_policy` (upsert por tenant, FR-06), `get/save_global_policy` (overrides), y `effective_global_policy` (overrides + defaults). Auditoría `admin.user_created/user_updated/tenant_policy_updated/global_policy_updated` sin PII.
+- `app/api/routes_admin.py` — `POST /admin/users` (201), `PATCH /admin/users/{user_id}`, `GET /admin/users` con paginación (limit/offset), `GET/PUT /admin/ai-policy` (`CONFIGURE_TENANT`), `GET/PUT /admin/ai-policies/global` (`MANAGE_AI_POLICIES`).
+- `app/api/routes_audit.py` — `GET /audit/events` con filtros opcionales (action, service, user_id, result, date_from, date_to) y evento `audit.view` registrado al leer (§11.1).
+- Tests: `tests/test_admin.py` (27 tests: CRUD de usuarios con restricciones de rol/tenant y aislamiento, políticas por tenant con aislamiento, políticas globales solo platform_admin, filtros de auditoría, evento `audit.view`, auditoría de acciones admin sin PII).
+- Suite completa: **171 tests pasados** (incluye regresión de features 002-015).
