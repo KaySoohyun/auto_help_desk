@@ -73,3 +73,16 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/schemas/audit.py` — schema de salida `AuditEventOut`.
 - Tests: `tests/test_audit.py` (auditoría de auth, sin PII, aislamiento por tenant, permisos, append-only).
 - Suite completa: 39 tests pasados (incluye regresión de features 002-004).
+- Commit `14011a1` en `feature/005-auditoria`; merge a `develop` (commit `8d27183`).
+
+### Fase 3 · API core de tickets — rama `feature/006-tickets`
+
+- Feature 006 creada en `ia_docs/features/006-tickets/`.
+- `app/models/ticket.py` — modelos `Ticket` (subject/description cifrados, status, category, priority, language, assignee, timestamps) y `TicketMessage` (body cifrado, FK a ticket con ondelete CASCADE).
+- `app/schemas/ticket.py` — schemas Pydantic v2 (`TicketCreate`, `TicketUpdate`, `TicketOut`, `TicketListOut`, `TicketMessageIn/Out`) con validación de status/prioridad.
+- `app/repositories/tickets.py` — `TicketRepository` (filtro por tenant, cifrado AES-GCM al escribir, descifrado al leer) que devuelve `TicketView`/`MessageView` (dataclass espejo) para no mutar el ORM con texto plano.
+- `app/api/routes_tickets.py` — `/v1/tickets`: `POST` (create), `GET /{id}`, `GET` (listado con filtros status/category/priority/assignee/fechas y paginación), `PATCH /{id}`, `POST /{id}/messages`, `GET /{id}/messages`, `POST /{id}/close`. RBAC aplicado; otro tenant → 404.
+- Auditoría en escrituras (ticket.created/updated/message/closed) con `trace_id` y `detail.ticket_id`.
+- `app/main.py` — router de tickets registrado.
+- Tests: `tests/test_tickets.py` (14 tests: CRUD, mensajes, cierre, cifrado en reposo, aislamiento 404, auditoría).
+- Suite completa: **53 tests pasados** (incluye regresión de features 002-005).

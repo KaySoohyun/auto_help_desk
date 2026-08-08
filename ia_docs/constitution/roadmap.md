@@ -9,16 +9,16 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 3. **003 · Autorización por tenant y RBAC** — catálogo de permisos por rol, `require_roles`/`require_permissions`, repositorio con filtro por tenant (ADR-001) y tests de aislamiento multi-tenant.
 4. **004 · Cifrado, secretos y protección de datos** — cifrado AES-GCM de campos (formato versionado, anti-tamper), validación de `SECRET_KEY` y plan de secretos (Vault).
 5. **005 · Auditoría, logging y trazabilidad** — modelo `AuditEvent` append-only, `AuditService`, eventos de auth auditados, endpoint `GET /audit/events` protegido y paginado.
+6. **006 · API core de tickets** — creación, consulta, listado con filtros/paginación, actualización, mensajes y cierre, con cifrado en reposo de campos sensibles y aislamiento por tenant.
 
 ## Siguiente 🔜
 
 _Lo próximo a abordar: Fase 3 (Backend / Almacenamiento Cloud), una feature en curso a la vez._
 
-6. **006 · API core de tickets** — creación, consulta, actualización, asignación y cierre con aislamiento por tenant.
+7. **007 · Redacción de PII** — detección y enmascaramiento de campos sensibles antes de cualquier uso externo.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
-6. **006 · API core de tickets** — creación, consulta, actualización, asignación y cierre con aislamiento por tenant.
 7. **007 · Redacción de PII** — detección y enmascaramiento de campos sensibles antes de cualquier uso externo.
 8. **008 · Optimización de consultas y rendimiento** — índices, paginación, caché y proyecciones ligeras.
 9. **009 · Observabilidad del backend** — métricas, trazas y alertas.

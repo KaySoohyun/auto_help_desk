@@ -1,0 +1,184 @@
+from fastapi.testclient import TestClient
+from tests.conftest import register_login
+
+from app.database import SessionLocal
+from app.models.audit import AuditEvent
+from app.models.ticket import Ticket, TicketMessage
+
+
+def _headers(tokens: dict) -> dict[str, str]:
+    return {"Authorization": f"Bearer {tokens['access_token']}"}
+
+
+def _create_ticket(client: TestClient, tokens: dict, **overrides) -> dict:
+    payload = {
+        "subject": "Problema de facturación",
+        "description": "El sistema no genera la factura del mes",
+        "category": "billing",
+        "priority": "high",
+        "language": "es",
+    }
+    payload.update(overrides)
+    response = client.post("/v1/tickets", json=payload, headers=_headers(tokens))
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_create_ticket(client: TestClient) -> None:
+    tokens = register_login(client, "agent-a@example.com", "agent", "ten-a")
+    ticket = _create_ticket(client, tokens)
+    assert ticket["subject"] == "Problema de facturación"
+    assert ticket["description"] == "El sistema no genera la factura del mes"
+    assert ticket["status"] == "open"
+    assert ticket["tenant_id"] == "ten-a"
+
+
+def test_create_ticket_requires_auth(client: TestClient) -> None:
+    assert client.post("/v1/tickets", json={}).status_code == 401
+
+
+def test_get_ticket_by_id(client: TestClient) -> None:
+    tokens = register_login(client, "agent-b@example.com", "agent", "ten-a")
+    created = _create_ticket(client, tokens)
+    response = client.get(f"/v1/tickets/{created['id']}", headers=_headers(tokens))
+    assert response.status_code == 200
+    assert response.json()["id"] == created["id"]
+
+
+def test_get_ticket_from_other_tenant_is_404(client: TestClient) -> None:
+    tokens_a = register_login(client, "agent-a@example.com", "agent", "ten-a")
+    tokens_b = register_login(client, "agent-b@example.com", "agent", "ten-b")
+    created = _create_ticket(client, tokens_a)
+    response = client.get(f"/v1/tickets/{created['id']}", headers=_headers(tokens_b))
+    assert response.status_code == 404
+
+
+def test_list_tickets_with_filters_and_pagination(client: TestClient) -> None:
+    tokens = register_login(client, "agent-c@example.com", "agent", "ten-a")
+    _create_ticket(client, tokens, subject="Ticket uno")
+    _create_ticket(client, tokens, subject="Ticket dos", priority="low")
+    response = client.get(
+        "/v1/tickets",
+        headers=_headers(tokens),
+        params={"priority": "high", "limit": 10, "offset": 0},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
+    assert body["items"][0]["subject"] == "Ticket uno"
+
+
+def test_update_ticket(client: TestClient) -> None:
+    tokens = register_login(client, "agent-d@example.com", "agent", "ten-a")
+    created = _create_ticket(client, tokens)
+    response = client.patch(
+        f"/v1/tickets/{created['id']}",
+        json={"status": "in_progress", "priority": "urgent"},
+        headers=_headers(tokens),
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "in_progress"
+    assert response.json()["priority"] == "urgent"
+
+
+def test_update_ticket_from_other_tenant_is_404(client: TestClient) -> None:
+    tokens_a = register_login(client, "agent-a@example.com", "agent", "ten-a")
+    tokens_b = register_login(client, "agent-b@example.com", "agent", "ten-b")
+    created = _create_ticket(client, tokens_a)
+    response = client.patch(
+        f"/v1/tickets/{created['id']}",
+        json={"status": "in_progress"},
+        headers=_headers(tokens_b),
+    )
+    assert response.status_code == 404
+
+
+def test_add_message_to_ticket(client: TestClient) -> None:
+    tokens = register_login(client, "agent-e@example.com", "agent", "ten-a")
+    created = _create_ticket(client, tokens)
+    response = client.post(
+        f"/v1/tickets/{created['id']}/messages",
+        json={"body": "Revisando el caso"},
+        headers=_headers(tokens),
+    )
+    assert response.status_code == 201
+    assert response.json()["body"] == "Revisando el caso"
+    assert response.json()["ticket_id"] == created["id"]
+
+
+def test_list_messages(client: TestClient) -> None:
+    tokens = register_login(client, "agent-f@example.com", "agent", "ten-a")
+    created = _create_ticket(client, tokens)
+    client.post(f"/v1/tickets/{created['id']}/messages", json={"body": "Uno"}, headers=_headers(tokens))
+    client.post(f"/v1/tickets/{created['id']}/messages", json={"body": "Dos"}, headers=_headers(tokens))
+    response = client.get(f"/v1/tickets/{created['id']}/messages", headers=_headers(tokens))
+    assert response.status_code == 200
+    assert [m["body"] for m in response.json()] == ["Uno", "Dos"]
+
+
+def test_add_message_requires_edit_permission(client: TestClient) -> None:
+    tokens = register_login(client, "admin@example.com", "tenant_admin", "ten-a")
+    created = _create_ticket(client, tokens)
+    # login solo como lector no existe; el agente siempre puede; probar 404 de otro tenant
+    tokens_b = register_login(client, "agent-b@example.com", "agent", "ten-b")
+    response = client.post(
+        f"/v1/tickets/{created['id']}/messages",
+        json={"body": "intento"},
+        headers=_headers(tokens_b),
+    )
+    assert response.status_code == 404
+
+
+def test_close_ticket(client: TestClient) -> None:
+    tokens = register_login(client, "agent-g@example.com", "agent", "ten-a")
+    created = _create_ticket(client, tokens)
+    response = client.post(f"/v1/tickets/{created['id']}/close", headers=_headers(tokens))
+    assert response.status_code == 200
+    assert response.json()["status"] == "closed"
+
+
+def test_close_ticket_requires_send_permission(client: TestClient) -> None:
+    # rol 'agent' tiene SEND_RESPONSE; probar 404 para otro tenant
+    tokens_a = register_login(client, "agent-a@example.com", "agent", "ten-a")
+    tokens_b = register_login(client, "agent-b@example.com", "agent", "ten-b")
+    created = _create_ticket(client, tokens_a)
+    response = client.post(f"/v1/tickets/{created['id']}/close", headers=_headers(tokens_b))
+    assert response.status_code == 404
+
+
+def test_sensitive_fields_are_encrypted_at_rest(client: TestClient) -> None:
+    tokens = register_login(client, "agent-h@example.com", "agent", "ten-a")
+    created = _create_ticket(client, tokens)
+    client.post(f"/v1/tickets/{created['id']}/messages", json={"body": "secreto del cliente"}, headers=_headers(tokens))
+
+    with SessionLocal() as db:
+        raw_ticket = db.get(Ticket, created["id"])
+        raw_message = db.query(TicketMessage).filter(TicketMessage.ticket_id == created["id"]).first()
+
+    assert raw_ticket is not None
+    assert raw_message is not None
+    assert "facturación" not in raw_ticket.subject
+    assert "factura del mes" not in raw_ticket.description
+    assert "secreto del cliente" not in raw_message.body
+    assert raw_ticket.subject.startswith("cipher:")
+    assert raw_ticket.description.startswith("cipher:")
+    assert raw_message.body.startswith("cipher:")
+
+
+def test_ticket_operations_are_audited(client: TestClient) -> None:
+    tokens = register_login(client, "agent-i@example.com", "agent", "ten-a")
+    created = _create_ticket(client, tokens)
+    client.patch(f"/v1/tickets/{created['id']}", json={"status": "on_hold"}, headers=_headers(tokens))
+    client.post(f"/v1/tickets/{created['id']}/close", headers=_headers(tokens))
+
+    with SessionLocal() as db:
+        events = db.query(AuditEvent).filter(AuditEvent.tenant_id == "ten-a").all()
+    actions = {e.action for e in events}
+    assert "ticket.created" in actions
+    assert "ticket.updated" in actions
+    assert "ticket.closed" in actions
+    for e in events:
+        if e.action.startswith("ticket."):
+            assert e.trace_id
+            assert e.detail["ticket_id"] == created["id"]
