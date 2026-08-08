@@ -15,12 +15,13 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 9. **009 · Observabilidad del backend** — registro de métricas en memoria (contadores, gauge e histogramas), middleware de latencia/errores/excepciones con `trace_id`, `GET /v1/metrics` en formato texto Prometheus protegido con `VIEW_AUDIT`, y métricas de negocio de tickets por tenant (sin PII). Sin dependencias externas.
 10. **010 · Orquestador LLM y conectores de IA** — punto único de llamadas LLM (ADR-002): proveedores HTTP (httpx, OpenAI-compatible) y mock, timeout/reintentos con backoff, rate limit en memoria por tenant+usuario, fallback seguro (`LLMUnavailableError`), métricas de tokens/latencia/errores (feature 009) y auditoría `llm.call` sin prompts. Expone `POST /v1/ai/ping` y `GET /v1/ai/info`.
 11. **011 · Clasificación automática de tickets** — servicio `TicketClassifier` sobre el orquestador: contexto redactado de PII, prompt versionado, salida JSON validada (categoría, subcategoría, intención, prioridad, confianza, rationale, warnings), persistencia en `ai_suggestions` (draft) y umbral de confianza con advertencia de revisión humana. `POST /v1/ai/tickets/{id}/classify`.
+12. **012 · Resumen automático de tickets** — `TicketSummarizer` con el mismo pipeline seguro: contexto redactado, tarea `summary`, resumen breve y accionable + información faltante, persistencia en `ai_suggestions` (draft) y umbral de confianza. `POST /v1/ai/tickets/{id}/summary`.
 
 ## Siguiente 🔜
 
 _Lo próximo a abordar: Fase 4 (Integración API IA), una feature en curso a la vez._
 
-12. **012 · Resumen automático de tickets** — problema principal, acciones previas, estado actual e información faltante.
+13. **013 · Sugerencia de respuesta editable** — borrador con grounding y fuentes.
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
