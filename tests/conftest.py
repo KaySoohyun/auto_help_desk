@@ -15,9 +15,23 @@ from app.database import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def clean_db() -> Generator[None, None, None]:
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+
 @pytest.fixture
 def client() -> Generator[TestClient, None, None]:
-    Base.metadata.create_all(bind=engine)
     with TestClient(app) as test_client:
         yield test_client
-    Base.metadata.drop_all(bind=engine)
+
+
+def register_login(client: TestClient, email: str, role: str, tenant_id: str | None = None) -> dict:
+    client.post(
+        "/auth/register",
+        json={"email": email, "password": "segura-123", "role": role, "tenant_id": tenant_id},
+    )
+    login = client.post("/auth/login", json={"email": email, "password": "segura-123"})
+    return login.json()

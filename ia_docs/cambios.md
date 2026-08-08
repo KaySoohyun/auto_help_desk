@@ -41,3 +41,14 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
   - `app/main.py` — app FastAPI con routers y `/health`.
 - Tests en `tests/`: 11 pasados (register, login, refresh con rotación, logout/revocación, claims, 401 diferenciado).
 - `.env.example` y `.env` actualizados con clave secreta larga.
+
+### Fase 2 · Autorización por tenant y RBAC — rama `feature/003-rbac-tenant`
+
+- Feature 003 creada en `ia_docs/features/003-rbac-tenant/`.
+- `app/core/permissions.py` — catálogo de permisos por rol (spec §10.3) y dependencias `require_permissions` / `require_roles` (403 sin permiso).
+- `app/core/deps.py` — nueva dependencia `get_tenant_id` (lee tenant_id del token, nunca del cliente).
+- `app/repositories/base.py` — `TenantScopedRepository` (filtro por tenant obligatorio, ADR-001).
+- `app/api/routes_admin.py` — endpoint de ejemplo `/admin/users` (RBAC + filtro por tenant).
+- `app/main.py` — router admin registrado.
+- Tests: `tests/test_permissions.py` + `tests/test_tenant_isolation.py` (aislamiento multi-tenant).
+- Suite completa: 20 tests pasados (incluye regresión de feature 002).
