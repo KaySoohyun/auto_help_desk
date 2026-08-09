@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import CONFIGURE_TENANT, MANAGE_AI_POLICIES, require_permissions
 from app.database import get_db
+from app.models.policy import TenantPolicy
 from app.models.user import User
 from app.schemas.admin import (
     GlobalPolicyIn,

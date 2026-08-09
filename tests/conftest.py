@@ -13,8 +13,13 @@ TEST_DB = f"sqlite:///{TEST_DB_DIR / 'test_auth.db'}"
 os.environ["DATABASE_URL"] = TEST_DB
 
 from app.core.config import settings  # noqa: E402
-from app.database import Base, engine  # noqa: E402
+from app.core.security import hash_password  # noqa: E402
+from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models.user import User  # noqa: E402
+
+# El registro público (/auth/register) solo permite roles no admin (seguridad).
+PUBLIC_REGISTRATION_ROLES = {"agent", "supervisor"}
 
 
 @pytest.fixture(autouse=True)
@@ -31,9 +36,23 @@ def client() -> Generator[TestClient, None, None]:
 
 
 def register_login(client: TestClient, email: str, role: str, tenant_id: str | None = None) -> dict:
-    client.post(
-        "/auth/register",
-        json={"email": email, "password": "segura-123", "role": role, "tenant_id": tenant_id},
-    )
-    login = client.post("/auth/login", json={"email": email, "password": "segura-123"})
+    password = "segura-123"
+    if role in PUBLIC_REGISTRATION_ROLES:
+        client.post(
+            "/auth/register",
+            json={"email": email, "password": password, "role": role, "tenant_id": tenant_id},
+        )
+    else:
+        with SessionLocal() as db:
+            db.add(
+                User(
+                    email=email,
+                    password_hash=hash_password(password),
+                    role=role,
+                    tenant_id=tenant_id,
+                    is_active=True,
+                )
+            )
+            db.commit()
+    login = client.post("/auth/login", json={"email": email, "password": password})
     return login.json()

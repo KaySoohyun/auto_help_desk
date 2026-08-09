@@ -33,6 +33,8 @@ from app.services.audit import AuditService, get_audit_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+PUBLIC_REGISTRATION_ROLES = {"agent", "supervisor"}
+
 
 def _issue_tokens(user: User, db: Session) -> TokenResponse:
     jti = str(uuid.uuid4())
@@ -76,6 +78,11 @@ def register(
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> User:
+    if payload.role not in PUBLIC_REGISTRATION_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Rol no permitido en el registro público",
+        )
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El email ya está registrado")

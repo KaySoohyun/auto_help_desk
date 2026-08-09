@@ -2,6 +2,24 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-09 · Despliegue a FastAPI Cloud
+
+- Despliegue real en **FastAPI Cloud** (app `auto-help-desk`, URL `https://auto-help-desk.fastapicloud.dev`), cuenta `julieta.raw@gmail.com`.
+- Preparación del repo para el despliegue:
+  - `.python-version` — fija Python 3.12 para la nube (el CLI local usa 3.14).
+  - `requirements.txt` — `fastapi==0.141.1` → `fastapi[standard]==0.141.1` (requisito de la plataforma).
+  - `.fastapicloud/cloud.json` — vinculación del repo a la app (creada por el CLI).
+- Variables de entorno de producción en la nube: `SECRET_KEY` (generada, secret), `DATABASE_URL` (Supabase, secret), `GEMINI_API_KEY` (secret), `LLM_PROVIDER=gemini`, `GEMINI_MODEL=gemini-3.6-flash`, `GEMINI_PROJECT_ID`.
+- Bugs latentes de compatibilidad Python 3.12 encontrados en el deploy (el entorno local es 3.14 y PEP 649 difiere la evaluación de anotaciones, ocultándolos):
+  - `app/api/routes_admin.py` — faltaba importar `TenantPolicy` (usado como anotación de retorno en `get_tenant_policy`/`save_tenant_policy`); agregado `from app.models.policy import TenantPolicy`.
+  - `app/repositories/tickets.py` — `list[MessageView]` resolvía al método `list` de la clase en 3.12 (`'function' object is not subscriptable`); agregado `from __future__ import annotations`.
+  - Validación completa: suite de 223 tests pasados dentro de un contenedor `python:3.12-slim` (docker) además del entorno local.
+- `DATABASE_URL` — la URL del pooler de Supabase trae `?pgbouncer=true`, que psycopg2 rechaza (`invalid dsn`); en la nube se fijó el pooler de sesión (`:5432`, `?sslmode=require`, sin `pgbouncer`). Nota: el CLI de env no sobrescribe variables: hay que `env delete --yes` y luego `env set`.
+- Verificación end-to-end contra el deploy: `GET /health` → `{"status":"ok","version":"0.1.0"}`; registro + login OK; `POST /v1/ai/ping` → `{"ok":true,"model":"gemini-3.6-flash"}` (Gemini real, no mock). Se creó un usuario de prueba (`e2e.deploy.<ts>@gmail.com`, id=1) en la DB de Supabase.
+- Usuario admin para operación: `admin@autohelpdesk.app` / rol `platform_admin` (id=2, creado en la DB de Supabase). Las **credenciales viven en el `.env` local** (`ADMIN_EMAIL`/`ADMIN_PASSWORD`, gitignored), fuera del repo. Uso documentado en `ia_docs/operations/admin-users.md` (smoke test del LLM). Verificado en vivo: `GET /v1/ai/info` → `{"provider":"gemini","model":"gemini-3.6-flash",...}` y `GET /v1/metrics` con token de admin.
+- Pendiente para próximos deploys: CORS (cuando exista frontend) y `OPENROUTER_API_KEY` (solo si se cambia `LLM_PROVIDER=openrouter`).
+- **Seguridad — restricción de rol en el registro:** `/auth/register` ahora solo permite `agent` y `supervisor` (`PUBLIC_REGISTRATION_ROLES` en `app/api/routes_auth.py`); `platform_admin` y `tenant_admin` devuelven 403. El admin se provisiona por seed/DB o vía `/v1/admin/users`, nunca por auto-registro. Tests: `register_login` del conftest crea roles admin directo en DB; nuevo test `test_register_rejects_admin_roles`.
+
 ## 2026-08-09
 
 - Soporte de proveedores LLM reales (`LLM_PROVIDER`): además de `mock` y `http` (genérico OpenAI-compatible), ahora `gemini` y `openrouter`. Sin SDKs: ambos usan el conector httpx OpenAI-compatible ya existente.

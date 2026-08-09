@@ -18,13 +18,23 @@ def test_register_creates_user(client: TestClient) -> None:
     payload = {
         "email": "admin@example.com",
         "password": "segura-123",
-        "role": "platform_admin",
+        "role": "agent",
     }
     response = client.post("/auth/register", json=payload)
     assert response.status_code == 201
     body = response.json()
     assert body["email"] == "admin@example.com"
     assert "password_hash" not in body
+
+
+def test_register_rejects_admin_roles(client: TestClient) -> None:
+    for role in ("platform_admin", "tenant_admin"):
+        response = client.post(
+            "/auth/register",
+            json={"email": f"{role}@example.com", "password": "segura-123", "role": role},
+        )
+        assert response.status_code == 403
+        assert "Rol no permitido" in response.json()["detail"]
 
 
 def test_register_duplicate_email(client: TestClient) -> None:
