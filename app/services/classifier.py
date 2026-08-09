@@ -66,6 +66,7 @@ class TicketClassifier:
         tenant_id: str | None,
         orchestrator: LLMOrchestrator | None = None,
         audit: AuditPort | None = None,
+        confidence_threshold: float | None = None,
     ) -> None:
         self._db = db
         self._user_id = user_id
@@ -74,6 +75,10 @@ class TicketClassifier:
         self._audit = audit
         self._redactor = PiiRedactor()
         self._repo = TicketRepository(db, tenant_id) if tenant_id else None
+        # Override de GlobalPolicy (018): None = usar settings.
+        self._confidence_threshold = (
+            confidence_threshold if confidence_threshold is not None else settings.ai_confidence_threshold
+        )
 
     def classify(
         self,
@@ -156,8 +161,7 @@ class TicketClassifier:
             )
         return parsed, suggestion
 
-    @staticmethod
-    def _parse_output(content: str, model: str) -> ClassificationResult:
+    def _parse_output(self, content: str, model: str) -> ClassificationResult:
         """Valida y normaliza la salida JSON del LLM (fallback seguro si es inválida)."""
         try:
             data = json.loads(content)
@@ -175,7 +179,7 @@ class TicketClassifier:
         confidence = float(data.get("confidence", 0.0))
         confidence = max(0.0, min(1.0, confidence))
         warnings = [str(w) for w in data.get("warnings", []) if isinstance(w, (str, int, float))]
-        if confidence < settings.ai_confidence_threshold:
+        if confidence < self._confidence_threshold:
             warnings.append("revisión humana recomendada: confianza baja")
 
         return ClassificationResult(

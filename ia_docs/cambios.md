@@ -227,3 +227,29 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - Evaluación IA y red teaming usan mock provider (dataset listo para proveedor real en 018); rendimiento mide patrón de consultas, no latencia absoluta (inestable en CI). Reutiliza `register_login`/`clean_db` del conftest y el patrón de mock de `test_guardrails.py`.
 - Suite completa: **200 tests pasados** (baseline `171 passed` + 29 nuevos, sin regresión).
 - `roadmap.md`: 017 movida a Hecho; Fase 6 iniciada; siguiente es 018 (CI/CD y operación).
+
+### Fase 6 · CI/CD y operación — rama `feat/18-cicd-operacion`
+
+- Feature 018 creada en `ia_docs/features/018-cicd-operacion/` (épicas 6.5-6.6; despliegue y operación).
+- Dependencias reproducibles: `requirements.txt` (11 runtime pinneadas) y `requirements-dev.txt` (`-r requirements.txt` + `pytest==9.1.1`); verificadas con instalación limpia en venv nuevo → suite en verde. Se añadió `psycopg2-binary==2.9.12` para soportar `DATABASE_URL` PostgreSQL en producción (tech-stack lo contempla).
+- `app/core/config.py` — `ai_features_enabled: bool = True` (kill-switch de despliegue); `SettingsConfigDict(extra="ignore")` para tolerar variables extra del entorno (p. ej. `DIRECT_URL` que genera Supabase) sin romper el arranque.
+- Versionado: `app/__init__.py` → `__version__ = "0.1.0"`; `app/main.py` → `GET /health` devuelve `{"status": "ok", "version": __version__}` (smoke de release).
+- Kill-switch (018): dependencia `_ai_features_enabled` en `routes_ai.py` sobre ping/classify/summary/suggested-reply → 503 "IA deshabilitada" + auditoría `ai.disabled` + métrica `ai_disabled_total`; no afecta a tickets ni al resto de la API.
+- Rollout por tenant (018): dependencia `_tenant_ai_enabled` que respeta `TenantPolicy.ai_enabled` (default True si no hay fila) → 403 "IA deshabilitada para este tenant" + auditoría `ai.tenant_disabled` + métrica `ai_tenant_disabled_total`. Solo los endpoints de generación IA; listado de sugerencias, feedback e info no se bloquean.
+- `app/services/policy.py` — `PolicyResolver.effective_global()`: valores efectivos de `GlobalPolicy` (via `effective_global_policy` de `admin.py`); sin fila → `GlobalPolicy(id=1)` con defaults de `.env` (sin cambio de comportamiento).
+- Overrides de `GlobalPolicy` aplicados en runtime:
+  - `LLMOrchestrator` acepta `model` y `rate_max_calls` (None = `settings`).
+  - `Guardrails` acepta `enabled` (None = `settings.guardrails_enabled`).
+  - `TicketClassifier`/`TicketSummarizer`/`TicketReplySuggester` aceptan `confidence_threshold` (antes leían settings internamente).
+  - `routes_ai.py` construye el orquestador y los servicios con los valores efectivos del resolver (`_orchestrator(audit, policy)`).
+- CI/release:
+  - `.github/workflows/ci.yml` — job `test` (instala deps, `check_secrets.sh`, `compileall`, `pytest -q`, smoke `/health` con TestClient) y job `release` (`workflow_dispatch`, `environment: production`, `release.sh --push`, solo rama `develop`); `python-version: "3.12"`.
+  - `scripts/check_secrets.sh` — verifica que `.env` no esté versionado y greps de patrones de secretos en archivos versionados.
+  - `scripts/release.sh` — valida la suite, lee `__version__`, crea tag `vX.Y.Z`; `--push` opcional. Ambos scripts ejecutados OK localmente.
+- `tests/conftest.py` — `/tmp/opencode` se crea con `mkdir(parents=True, exist_ok=True)` (robusto en CI con HOME limpio).
+- `tests/test_deploy.py` — 16 tests: `/health` con `version`; kill-switch 503 en los 4 endpoints IA (auditoría `ai.disabled` + métrica, restauración al volver a `True`); rollout por tenant 403 (auditoría `ai.tenant_disabled` + métrica, `/v1/ai/info` no bloqueado, default sin fila = habilitado); overrides de `GlobalPolicy` (resolver honra overrides y defaults, `llm_model` llega al ping, `llm_rate_max_calls=1` → 429, `Guardrails(enabled=False)` vence a `settings`).
+- Operación: `ia_docs/operations/` — `dashboard.md` (inventario de métricas de la 009 + queries PromQL sugeridas por panel), `alerts.md` (9 reglas base: LLM caído/degradado, 5xx, excepciones, guardrails, rate limit, kill-switch, tenant disabled, PII) y `runbooks/{release,rollback,incidents}.md` (LLM caído, prompt injection, fuga de PII, rate limit).
+- `AGENTS.md` — comandos dev/test definidos (instalar deps, uvicorn dev, pytest, compileall, check_secrets, release, health).
+- Suite completa: **216 tests pasados** (baseline `200 passed` + 16 nuevos, sin regresión).
+- `roadmap.md`: 018 movida a Hecho; Fase 6 completada; el roadmap de las fases 1-6 está completo (features 001-018).
+- Nota de entorno: el `.env` local apunta a PostgreSQL (Supabase) y quedó fuera de control de versiones; `extra="ignore"` + `psycopg2-binary` permiten arrancar con esa configuración.

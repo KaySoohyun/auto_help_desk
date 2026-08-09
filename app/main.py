@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app import __version__
 from app.api.routes_admin import router as admin_router
 from app.api.routes_ai import router as ai_router
 from app.api.routes_audit import router as audit_router
@@ -35,4 +36,5 @@ def on_startup() -> None:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    """Health check del servicio. `version` alimenta el smoke de release (018)."""
+    return {"status": "ok", "version": __version__}

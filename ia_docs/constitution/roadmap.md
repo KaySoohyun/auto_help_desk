@@ -4,6 +4,7 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 
 ## Hecho ✅
 
+18. **018 · CI/CD y operación** — dependencias reproducibles (`requirements*.txt` pinneados), pipeline CI (tests, `compileall`, chequeo de secretos, smoke `/health`, release con gate de aprobación), `__version__` en `/health` y `scripts/release.sh` (tag `vX.Y.Z`), rollout por tenants y feature flags conectados al runtime (`TenantPolicy.ai_enabled` → 403; `AI_FEATURES_ENABLED=false` → 503; overrides de `GlobalPolicy` aplicados al orquestador/guardrails/servicios IA), y operación (`ia_docs/operations/` con dashboard, alertas y runbooks). `216 passed` sin regresión.
 17. **017 · Pruebas y red teaming** — suite de verificación (Fase 6, épicas 6.1-6.4): datasets de control (`tests/datasets/redteam.py`, `classification.py`), red teaming de prompt injection sobre los endpoints IA reales (sin fuga de PII, auditoría `alert`, bloqueo 422, cruce de tenants 404, rate limit 429), evaluación de IA con dataset de control (FR-01/07/08, sin alucinación) y patrón de consultas de listados sin `description` diferida ni N+1. `200 passed` sin regresión.
 1. **001 · Fundamentos y arquitectura** — base del repo, configuración `.env`, ADRs y backlog priorizado (Fase 1). Entregables en `ia_docs/architecture/`.
 2. **002 · Autenticación JWT/OAuth** — login, refresh rotativo, logout con revocación, validación de tokens (exp, iss, aud, roles) y hash argon2.
@@ -24,9 +25,7 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 
 ## Siguiente 🔜
 
-_18 · CI/CD y operación (018): pipelines, rollout por tenants, feature flags, dashboards, runbooks y release a producción. Una feature en curso a la vez._
-
-18. **018 · CI/CD y operación** — pipelines, rollout por tenants, feature flags, dashboards, runbooks y release a producción.
+_Bajo demanda. El roadmap de las fases 1-6 (features 001-018) está completo._
 
 ## Fase 3: Backend / Almacenamiento Cloud 💾
 
@@ -51,7 +50,7 @@ _Completada (features 015-016)._
 
 ## Fase 6: Testing / Despliegue 🚀
 
-_Iniciada (feature 017 completada)._
+_Completada (features 017-018)._
 
 17. **017 · Pruebas y red teaming** — funcionales, seguridad/privacidad multi-tenancy, rendimiento y evaluación de IA.
 18. **018 · CI/CD y operación** — pipelines, rollout por tenants, feature flags, dashboards, runbooks y release a producción.

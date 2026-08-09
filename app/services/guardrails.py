@@ -32,17 +32,25 @@ class GuardrailReport:
 
 
 class Guardrails:
-    """Filtros deterministas de entrada y salida para las llamadas LLM."""
+    """Filtros deterministas de entrada y salida para las llamadas LLM.
 
-    def __init__(self) -> None:
+    `enabled` permite aplicar un override de `GlobalPolicy` (018). Si es `None`
+    se usa `settings.guardrails_enabled` (comportamiento por defecto).
+    """
+
+    def __init__(self, enabled: bool | None = None) -> None:
         self._redactor = PiiRedactor()
+        self._enabled = enabled
+
+    def _is_enabled(self) -> bool:
+        return settings.guardrails_enabled if self._enabled is None else self._enabled
 
     def _compile(self, patterns: list[str]) -> list[re.Pattern[str]]:
         return [re.compile(p, re.IGNORECASE) for p in patterns]
 
     def check_output(self, content: str) -> GuardrailReport:
         """Filtra la salida del LLM. Bloquea si hay PII cruda o contenido prohibido."""
-        if not settings.guardrails_enabled or not content:
+        if not self._is_enabled() or not content:
             return GuardrailReport()
 
         report = GuardrailReport()
@@ -61,7 +69,7 @@ class Guardrails:
 
     def check_input(self, content: str) -> GuardrailReport:
         """Detecta patrones de prompt injection en la entrada (informativo, no bloquea)."""
-        if not settings.guardrails_enabled or not content:
+        if not self._is_enabled() or not content:
             return GuardrailReport()
 
         report = GuardrailReport()

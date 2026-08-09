@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app import __version__
 from app.core.config import settings
 from app.main import app
 
@@ -8,7 +9,9 @@ from app.main import app
 def test_health(client: TestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["version"] == __version__
 
 
 def test_register_creates_user(client: TestClient) -> None:
