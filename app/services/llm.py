@@ -67,8 +67,15 @@ def _openai_payload(messages: list[dict[str, str]], model: str, max_tokens: int,
 class HTTPLLMProvider:
     """Proveedor HTTP OpenAI-compatible (chat completions)."""
 
-    def __init__(self, base_url: str, api_key: str, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        timeout_seconds: float,
+        chat_path: str = "/v1/chat/completions",
+    ) -> None:
         self._base_url = base_url.rstrip("/")
+        self._chat_path = chat_path if chat_path.startswith("/") else f"/{chat_path}"
         self._api_key = api_key
         self._timeout = timeout_seconds
 
@@ -84,7 +91,7 @@ class HTTPLLMProvider:
         headers = {"Authorization": f"Bearer {self._api_key}"}
         with httpx.Client(timeout=self._timeout) as client:
             response = client.post(
-                f"{self._base_url}/v1/chat/completions",
+                f"{self._base_url}{self._chat_path}",
                 headers=headers,
                 json=_openai_payload(messages, model, max_tokens, temperature),
             )
@@ -145,12 +152,46 @@ class MockLLMProvider:
         )
 
 
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com"
+GEMINI_CHAT_PATH = "/v1beta/openai/chat/completions"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api"
+OPENROUTER_CHAT_PATH = "/v1/chat/completions"
+
+
 def get_llm_provider(settings: Settings) -> BaseLLMProvider:
-    """Devuelve el proveedor configurado por env (`LLM_PROVIDER`)."""
+    """Devuelve el proveedor configurado por env (`LLM_PROVIDER`).
+
+    Valores: `mock` (dev/tests, sin red), `http` (OpenAI-compatible genérico
+    con `LLM_BASE_URL`/`LLM_API_KEY`), `gemini` (Google AI Studio vía endpoint
+    OpenAI-compatible) u `openrouter`. Sin SDKs: httpx contra chat completions.
+    """
+    if settings.llm_provider == "gemini":
+        api_key = settings.gemini_api_key.get_secret_value()
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY requerida para LLM_PROVIDER=gemini")
+        return HTTPLLMProvider(
+            GEMINI_BASE_URL,
+            api_key,
+            settings.llm_timeout_seconds,
+            chat_path=GEMINI_CHAT_PATH,
+        )
+    if settings.llm_provider == "openrouter":
+        api_key = settings.openrouter_api_key.get_secret_value()
+        if not api_key:
+            raise ValueError("OPENROUTER_API_KEY requerida para LLM_PROVIDER=openrouter")
+        return HTTPLLMProvider(
+            OPENROUTER_BASE_URL,
+            api_key,
+            settings.llm_timeout_seconds,
+            chat_path=OPENROUTER_CHAT_PATH,
+        )
     if settings.llm_provider == "http":
         return HTTPLLMProvider(
-            base_url=settings.llm_base_url,
-            api_key=settings.llm_api_key.get_secret_value(),
-            timeout_seconds=settings.llm_timeout_seconds,
+            settings.llm_base_url,
+            settings.llm_api_key.get_secret_value(),
+            settings.llm_timeout_seconds,
+            chat_path=settings.llm_chat_path,
         )
-    return MockLLMProvider(model=settings.llm_model)
+    if settings.llm_provider == "mock":
+        return MockLLMProvider(model=settings.llm_effective_model)
+    raise ValueError(f"LLM_PROVIDER inválido: {settings.llm_provider!r}")

@@ -130,7 +130,7 @@ def ai_info(
     """Config del orquestador sin secretos (spec §14.4)."""
     return {
         "provider": settings.llm_provider,
-        "model": settings.llm_model,
+        "model": settings.llm_effective_model,
         "rate_max_calls": settings.llm_rate_max_calls,
         "rate_window_seconds": settings.llm_rate_window_seconds,
         "max_retries": settings.llm_max_retries,

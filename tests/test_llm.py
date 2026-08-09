@@ -3,10 +3,19 @@ import pytest
 from fastapi.testclient import TestClient
 from tests.conftest import register_login
 
+from app.core.config import settings
 from app.core.metrics import metrics
 from app.core.rate_limit import RateLimitStore, rate_limit_store
 from app.models.audit import AuditEvent
-from app.services.llm import MockLLMProvider
+from app.services.llm import (
+    GEMINI_BASE_URL,
+    GEMINI_CHAT_PATH,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_CHAT_PATH,
+    HTTPLLMProvider,
+    MockLLMProvider,
+    get_llm_provider,
+)
 from app.services.llm_orchestrator import LLMOrchestrator
 
 
@@ -140,7 +149,7 @@ def test_ai_info_ok_for_supervisor(client: TestClient) -> None:
     resp = client.get("/v1/ai/info", headers=_headers(tokens))
     assert resp.status_code == 200
     body = resp.json()
-    assert body["provider"] in ("mock", "http")
+    assert body["provider"] in ("mock", "http", "gemini", "openrouter")
     assert "model" in body
     assert "api_key" not in str(body)
 
@@ -154,3 +163,67 @@ def test_ping_is_audited_in_db(client: TestClient) -> None:
         events = db.query(AuditEvent).filter(AuditEvent.action == "llm.call").all()
     assert len(events) >= 1
     assert events[0].detail["task"] == "ping"
+
+
+# --- configuración de proveedores reales (018) -------------------------------
+
+
+def test_llm_effective_model_defaults_to_settings() -> None:
+    assert settings.llm_effective_model == settings.llm_model
+
+
+def test_llm_effective_model_for_gemini(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "llm_provider", "gemini")
+    monkeypatch.setattr(settings, "gemini_model", "gemini-3.6-flash")
+    assert settings.llm_effective_model == "gemini-3.6-flash"
+
+
+def test_get_llm_provider_gemini(monkeypatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(settings, "llm_provider", "gemini")
+    monkeypatch.setattr(settings, "gemini_api_key", SecretStr("test-gemini-key"))
+    monkeypatch.setattr(settings, "gemini_model", "gemini-3.6-flash")
+    provider = get_llm_provider(settings)
+    assert isinstance(provider, HTTPLLMProvider)
+    assert provider._base_url == GEMINI_BASE_URL
+    assert provider._chat_path == GEMINI_CHAT_PATH
+    assert provider._api_key == "test-gemini-key"
+
+
+def test_get_llm_provider_openrouter(monkeypatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(settings, "llm_provider", "openrouter")
+    monkeypatch.setattr(settings, "openrouter_api_key", SecretStr("test-or-key"))
+    provider = get_llm_provider(settings)
+    assert isinstance(provider, HTTPLLMProvider)
+    assert provider._base_url == OPENROUTER_BASE_URL
+    assert provider._chat_path == OPENROUTER_CHAT_PATH
+    assert provider._api_key == "test-or-key"
+
+
+def test_get_llm_provider_gemini_requires_key(monkeypatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(settings, "llm_provider", "gemini")
+    monkeypatch.setattr(settings, "gemini_api_key", SecretStr(""))
+    with pytest.raises(ValueError):
+        get_llm_provider(settings)
+
+
+def test_get_llm_provider_http_uses_configured_path(monkeypatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(settings, "llm_provider", "http")
+    monkeypatch.setattr(settings, "llm_base_url", "https://llm.example.com")
+    monkeypatch.setattr(settings, "llm_api_key", SecretStr("test-http-key"))
+    monkeypatch.setattr(settings, "llm_chat_path", "/custom/chat/completions")
+    provider = get_llm_provider(settings)
+    assert isinstance(provider, HTTPLLMProvider)
+    assert provider._base_url == "https://llm.example.com"
+    assert provider._chat_path == "/custom/chat/completions"
+
+
+def test_get_llm_provider_default_is_mock() -> None:
+    assert isinstance(get_llm_provider(settings), MockLLMProvider)

@@ -253,7 +253,7 @@ class AdminService:
 def effective_global_policy(policy: GlobalPolicy) -> dict[str, Any]:
     """Valores efectivos: override de `settings` + defaults de `.env`."""
     return {
-        "llm_model": policy.llm_model or settings.llm_model,
+        "llm_model": policy.llm_model or settings.llm_effective_model,
         "ai_confidence_threshold": (
             policy.ai_confidence_threshold
             if policy.ai_confidence_threshold is not None

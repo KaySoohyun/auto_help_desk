@@ -194,7 +194,7 @@ class LLMOrchestrator:
             try:
                 return provider.complete(
                     messages=messages,
-                    model=model or self._model or settings.llm_model,
+                    model=model or self._model or settings.llm_effective_model,
                     max_tokens=settings.llm_max_tokens,
                     temperature=temperature,
                 )

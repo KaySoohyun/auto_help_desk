@@ -25,12 +25,19 @@ class Settings(BaseSettings):
     llm_base_url: str = ""
     llm_api_key: SecretStr = SecretStr("")
     llm_model: str = "gpt-4o-mini"
+    llm_chat_path: str = "/v1/chat/completions"
     llm_timeout_seconds: float = 15.0
     llm_max_retries: int = 2
     llm_retry_backoff: float = 0.5
     llm_max_tokens: int = 1024
     llm_rate_max_calls: int = 60
     llm_rate_window_seconds: int = 60
+
+    # Proveedores específicos (018): el activo se elige con `LLM_PROVIDER`.
+    gemini_api_key: SecretStr = SecretStr("")
+    gemini_model: str = ""
+    gemini_project_id: str = ""
+    openrouter_api_key: SecretStr = SecretStr("")
 
     ai_confidence_threshold: float = 0.6
     ai_classify_categories: str = (
@@ -57,6 +64,17 @@ class Settings(BaseSettings):
         r"exfiltra",
         r"cambia tu rol",
     ]
+
+    @property
+    def llm_effective_model(self) -> str:
+        """Modelo por defecto según el proveedor configurado (018).
+
+        Con `LLM_PROVIDER=gemini` usa `GEMINI_MODEL` (los modelos de Gemini
+        no son compatibles con el nombre por defecto de OpenAI).
+        """
+        if self.llm_provider == "gemini":
+            return self.gemini_model or self.llm_model
+        return self.llm_model
 
     @property
     def encryption_key(self) -> bytes:

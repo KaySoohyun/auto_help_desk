@@ -2,6 +2,17 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-09
+
+- Soporte de proveedores LLM reales (`LLM_PROVIDER`): además de `mock` y `http` (genérico OpenAI-compatible), ahora `gemini` y `openrouter`. Sin SDKs: ambos usan el conector httpx OpenAI-compatible ya existente.
+  - `app/core/config.py` — nuevas variables: `llm_chat_path` (ruta del chat completions, default `/v1/chat/completions`), `gemini_api_key`, `gemini_model`, `gemini_project_id`, `openrouter_api_key`; propiedad `llm_effective_model` (con `gemini` usa `GEMINI_MODEL` porque los nombres de Gemini no son compatibles con el default OpenAI).
+  - `app/services/llm.py` — `HTTPLLMProvider` acepta `chat_path`; `get_llm_provider` resuelve `gemini` → `https://generativelanguage.googleapis.com` + `/v1beta/openai/chat/completions` (Google AI Studio), `openrouter` → `https://openrouter.ai/api` + `/v1/chat/completions`; fail-fast si falta la key o el provider es inválido.
+  - Orquestador, `effective_global_policy` y `GET /v1/ai/info` usan `llm_effective_model` (el `GlobalPolicy.llm_model` sigue teniendo prioridad como override).
+  - Pruebas reales (sin exponer keys): **Gemini OK** (`gemini-3.6-flash` → "pong", ~2s) y **OpenRouter OK** tras regenerar la key (el primer intento con la key anterior daba 401 "User not found" del lado del proveedor; la key nueva de 73 chars responde `openai/gpt-4o-mini` → "pong", ~1s).
+  - `.env` — agregada `GEMINI_MODEL` (copiada del valor de `model`); `LLM_PROVIDER` se elige por entorno al arrancar (no se fija en `.env` para no desviar la suite de tests del mock).
+  - Tests: `tests/test_llm.py` +7 (resolución de `llm_effective_model`, construcción de proveedores gemini/openrouter/http, key faltante → `ValueError`, provider inválido → `ValueError`, default mock).
+  - Suite completa: **223 tests pasados** (baseline `216 passed` + 7 nuevos, sin regresión). — `develop`
+
 ## 2026-08-08
 
 - Creación de la constitución del proyecto (`ia_docs/constitution/`): misión, roadmap y tech-stack, derivados de `spec.md` y `plan-ejecucion.md`. — `main`
