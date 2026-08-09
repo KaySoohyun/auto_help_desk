@@ -1,40 +1,105 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.core.config import settings
 from app.core.deps import get_trace_id
+from app.core.metrics import metrics
 from app.core.permissions import REQUEST_AI_SUGGESTION, VIEW_AUDIT, require_permissions
 from app.database import get_db
+from app.models.policy import TenantPolicy
 from app.models.user import User
 from app.schemas.ai import ClassificationOut, SuggestedReplyOut, SuggestedReplyRequest, SummaryOut
 from app.schemas.llm import LLMPingInfo
 from app.services.audit import AuditService, get_audit_service
 from app.services.classifier import ClassificationError, TicketClassifier
-from app.services.guardrails import OutputBlockedError
+from app.services.guardrails import Guardrails, OutputBlockedError
 from app.services.llm import LLMRateLimitExceeded, LLMUnavailableError
 from app.services.llm_orchestrator import LLMOrchestrator
+from app.services.policy import PolicyResolver
 from app.services.reply_suggester import ReplyError, TicketReplySuggester
 from app.services.summarizer import SummaryError, TicketSummarizer
 
 router = APIRouter(prefix="/v1/ai", tags=["ai"])
 
 
-def _orchestrator(audit: AuditService) -> LLMOrchestrator:
-    return LLMOrchestrator(audit=audit)
+def _orchestrator(audit: AuditService, policy: dict[str, Any]) -> LLMOrchestrator:
+    """Orquestador con los overrides efectivos de `GlobalPolicy` (018)."""
+    return LLMOrchestrator(
+        audit=audit,
+        guardrails=Guardrails(enabled=policy["guardrails_enabled"]),
+        model=policy["llm_model"],
+        rate_max_calls=policy["llm_rate_max_calls"],
+    )
 
 
 def _trace() -> str:
     return get_trace_id()
 
 
+def _ai_features_enabled(
+    current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_trace),
+) -> None:
+    """Kill-switch de despliegue (018): si la IA está deshabilitada, 503 auditado."""
+    if settings.ai_features_enabled:
+        return
+    audit.log(
+        "ai.disabled",
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id,
+        service="ai",
+        trace_id=trace_id,
+        result="disabled",
+    )
+    metrics.inc("ai_disabled_total")
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="IA deshabilitada",
+    )
+
+
+def _tenant_ai_enabled(
+    current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_trace),
+) -> None:
+    """Rollout por tenant (018): respeta `TenantPolicy.ai_enabled` (default True)."""
+    policy = db.scalars(
+        select(TenantPolicy).where(TenantPolicy.tenant_id == current_user.tenant_id)
+    ).first()
+    if policy is None or policy.ai_enabled:
+        return
+    audit.log(
+        "ai.tenant_disabled",
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id,
+        service="ai",
+        trace_id=trace_id,
+        result="disabled",
+    )
+    metrics.inc("ai_tenant_disabled_total")
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="IA deshabilitada para este tenant",
+    )
+
+
 @router.post("/ping", response_model=LLMPingInfo)
 def ai_ping(
+    _: None = Depends(_ai_features_enabled),
+    _tenant: None = Depends(_tenant_ai_enabled),
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_trace),
 ) -> LLMPingInfo:
     """Prueba de conectividad del orquestador LLM (sin PII, sin red en dev)."""
-    orchestrator = _orchestrator(audit)
+    policy = PolicyResolver(db).effective_global()
+    orchestrator = _orchestrator(audit, policy)
     try:
         result = orchestrator.complete(
             task="ping",
@@ -75,18 +140,22 @@ def ai_info(
 @router.post("/tickets/{ticket_id}/classify", response_model=ClassificationOut)
 def classify_ticket(
     ticket_id: int,
+    _: None = Depends(_ai_features_enabled),
+    _tenant: None = Depends(_tenant_ai_enabled),
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_trace),
 ) -> ClassificationOut:
     """Clasifica un ticket con IA (spec §15.1). El contexto va redactado de PII."""
+    policy = PolicyResolver(db).effective_global()
     classifier = TicketClassifier(
         db,
         user_id=current_user.id,
         tenant_id=current_user.tenant_id,
-        orchestrator=_orchestrator(audit),
+        orchestrator=_orchestrator(audit, policy),
         audit=audit,
+        confidence_threshold=policy["ai_confidence_threshold"],
     )
     try:
         result, suggestion = classifier.classify(ticket_id, trace_id=trace_id)
@@ -121,18 +190,22 @@ def classify_ticket(
 @router.post("/tickets/{ticket_id}/summary", response_model=SummaryOut)
 def summarize_ticket(
     ticket_id: int,
+    _: None = Depends(_ai_features_enabled),
+    _tenant: None = Depends(_tenant_ai_enabled),
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_trace),
 ) -> SummaryOut:
     """Resume un ticket con IA (spec §15.2). El contexto va redactado de PII."""
+    policy = PolicyResolver(db).effective_global()
     summarizer = TicketSummarizer(
         db,
         user_id=current_user.id,
         tenant_id=current_user.tenant_id,
-        orchestrator=_orchestrator(audit),
+        orchestrator=_orchestrator(audit, policy),
         audit=audit,
+        confidence_threshold=policy["ai_confidence_threshold"],
     )
     try:
         result, suggestion = summarizer.summarize(ticket_id, trace_id=trace_id)
@@ -164,6 +237,8 @@ def summarize_ticket(
 @router.post("/tickets/{ticket_id}/suggested-reply", response_model=SuggestedReplyOut)
 def suggest_reply(
     ticket_id: int,
+    _: None = Depends(_ai_features_enabled),
+    _tenant: None = Depends(_tenant_ai_enabled),
     body: SuggestedReplyRequest | None = None,
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
     db: Session = Depends(get_db),
@@ -171,12 +246,14 @@ def suggest_reply(
     trace_id: str = Depends(_trace),
 ) -> SuggestedReplyOut:
     """Sugiere una respuesta editable para un ticket con IA (spec §15.3). El contexto va redactado de PII."""
+    policy = PolicyResolver(db).effective_global()
     suggester = TicketReplySuggester(
         db,
         user_id=current_user.id,
         tenant_id=current_user.tenant_id,
-        orchestrator=_orchestrator(audit),
+        orchestrator=_orchestrator(audit, policy),
         audit=audit,
+        confidence_threshold=policy["ai_confidence_threshold"],
     )
     try:
         result, suggestion = suggester.suggest_reply(

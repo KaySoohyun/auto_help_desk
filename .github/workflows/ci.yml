@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+      - name: Chequeo de secretos en archivos versionados
+        run: bash scripts/check_secrets.sh
+      - name: Chequeo de sintaxis
+        run: python -m compileall -q app tests
+      - name: Suite de tests
+        run: python -m pytest -q
+      - name: Smoke de salud y release
+        run: python -c "from fastapi.testclient import TestClient; from app import __version__; from app.main import app; r = TestClient(app).get('/health'); print(r.json()); assert r.status_code == 200 and r.json()['status'] == 'ok' and r.json()['version'] == __version__"
+
+  release:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+      - name: Crear tag de release (vX.Y.Z)
+        run: bash scripts/release.sh --push

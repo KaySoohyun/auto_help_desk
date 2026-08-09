@@ -3,7 +3,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_name: str = "Auto Help Desk API"
     api_v1_prefix: str = "/v1"
@@ -33,6 +37,8 @@ class Settings(BaseSettings):
         "billing,technical,account,general,urgent,feedback,other"
     )
     ai_classify_intents: str = "request,incident,question,complaint,other"
+
+    ai_features_enabled: bool = True
 
     guardrails_enabled: bool = True
     guardrail_prohibited_patterns: list[str] = [

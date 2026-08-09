@@ -49,11 +49,16 @@ class LLMOrchestrator:
         rate_limit: RateLimitStore | None = None,
         audit: AuditPort | None = None,
         guardrails: Guardrails | None = None,
+        model: str | None = None,
+        rate_max_calls: int | None = None,
     ) -> None:
         self._provider = provider
         self._rate_limit = rate_limit or rate_limit_store
         self._audit = audit
         self._guardrails = guardrails or Guardrails()
+        # Overrides de GlobalPolicy (018): None = usar settings.
+        self._model = model
+        self._rate_max_calls = rate_max_calls
 
     @property
     def provider(self) -> BaseLLMProvider | None:
@@ -85,7 +90,7 @@ class LLMOrchestrator:
         """
         key = f"{tenant_id or '-'}:{user_id or '-'}"
         if not self._rate_limit.allow_and_record(
-            key, settings.llm_rate_max_calls, settings.llm_rate_window_seconds
+            key, self._rate_max_calls or settings.llm_rate_max_calls, settings.llm_rate_window_seconds
         ):
             self._audit_call(
                 task=task,
@@ -189,7 +194,7 @@ class LLMOrchestrator:
             try:
                 return provider.complete(
                     messages=messages,
-                    model=model or settings.llm_model,
+                    model=model or self._model or settings.llm_model,
                     max_tokens=settings.llm_max_tokens,
                     temperature=temperature,
                 )

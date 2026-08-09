@@ -3,7 +3,14 @@
 Actúa como un ingeniero backend senior especializado en Python, FastAPI, seguridad y JWT.
 
 ## Comandos
-<!-- TODO -->
+
+- Instalar dependencias: `python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`
+- Correr la app (dev): `.venv/bin/uvicorn app.main:app --reload` (requiere `.env`; DB por `DATABASE_URL`)
+- Correr tests: `.venv/bin/python -m pytest -q`
+- Chequeo de sintaxis: `.venv/bin/python -m compileall -q app tests scripts`
+- Chequeo de secretos: `bash scripts/check_secrets.sh`
+- Release (crea tag `vX.Y.Z`): `bash scripts/release.sh [--push]`
+- Health check: `curl -s localhost:8000/health`
 
 ## Reglas
 

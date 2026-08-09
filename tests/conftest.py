@@ -6,7 +6,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 # Aislar la config antes de importar la app: usar una DB de test en /tmp
-TEST_DB = f"sqlite:///{Path('/tmp/opencode') / 'test_auth.db'}"
+TEST_DB_DIR = Path("/tmp/opencode")
+TEST_DB_DIR.mkdir(parents=True, exist_ok=True)
+TEST_DB = f"sqlite:///{TEST_DB_DIR / 'test_auth.db'}"
 
 os.environ["DATABASE_URL"] = TEST_DB
 
