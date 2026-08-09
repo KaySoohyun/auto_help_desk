@@ -204,3 +204,26 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - `app/api/routes_audit.py` — `GET /audit/events` con filtros opcionales (action, service, user_id, result, date_from, date_to) y evento `audit.view` registrado al leer (§11.1).
 - Tests: `tests/test_admin.py` (27 tests: CRUD de usuarios con restricciones de rol/tenant y aislamiento, políticas por tenant con aislamiento, políticas globales solo platform_admin, filtros de auditoría, evento `audit.view`, auditoría de acciones admin sin PII).
 - Suite completa: **171 tests pasados** (incluye regresión de features 002-015).
+
+### Fase 6 · Pruebas y red teaming — rama `feat/17-pruebas-red-teaming`
+
+- Feature 017 creada en `ia_docs/features/017-pruebas-red-teaming/` (épicas 6.1-6.4; verificación, sin cambios de código de producto).
+- `tests/datasets/` — paquete de datasets de control:
+  - `redteam.py` — `INJECTION_PAYLOADS`: 6 payloads de prompt injection cubriendo 5 efectos (rol_change, exfiltration, reveal_prompt, embedded_instructions, jailbreak) con `expected_effect` y `expect_blocked_output`.
+  - `classification.py` — `CLASSIFICATION_CASES`: 7 tickets de control (categorías billing/technical/account/general/feedback/urgent/other, intenciones request/incident/question/complaint/other, prioridades low/medium/high/urgent) con salida esperada, y `MockClassifyProvider` (mock determinista por caso, FR-01).
+- `tests/test_redteam.py` (épica 6.4, §12.1):
+  - Parametrizado `test_injection_payloads_do_not_execute_or_leak`: la inyección en el ticket NO se ejecuta ni filtra PII, y queda auditada como `llm.call` con `result="alert"`.
+  - Parametrizado `test_blocked_output_when_llm_cooperates`: si el LLM "coopera" devolviendo el contenido peligroso, los guardrails responden 422 "Contenido bloqueado por política de seguridad".
+  - `test_classify_ticket_of_other_tenant_404` / `test_suggestions_of_other_tenant_404`: cruce de tenants en classify/suggestions.
+  - `test_rate_limit_exceeded_429`: exceder `llm_rate_max_calls` → 429 y auditoría `result="rate_limited"`.
+- `tests/test_ia_evaluation.py` (épica 6.4, §17.2):
+  - Parametrizado `test_classification_matches_dataset` sobre `CLASSIFICATION_CASES`: schema válido y categoría/intención/prioridad coherentes (FR-01).
+  - `test_low_confidence_warning`: confianza 0.3 → warning de revisión humana (FR-07).
+  - `test_reply_without_sources_has_warning` y `test_no_hallucination_when_no_grounding`: respuesta sugerida sin fuentes no alucina y advierte (FR-08).
+- `tests/test_performance.py` (épica 6.3, §16): fixture `query_counter` (evento `after_cursor_execute` en el engine).
+  - `test_list_does_not_load_deferred_description`: el listado no expone `description` (columna diferida, feature 008).
+  - `test_list_emits_bounded_queries`: número fijo/bajo de queries (sin N+1), independiente del tamaño de la página.
+  - `test_pagination_respects_limits` y `test_total_count_with_filters`: `limit`/`offset`/`total` correctos con y sin filtros.
+- Evaluación IA y red teaming usan mock provider (dataset listo para proveedor real en 018); rendimiento mide patrón de consultas, no latencia absoluta (inestable en CI). Reutiliza `register_login`/`clean_db` del conftest y el patrón de mock de `test_guardrails.py`.
+- Suite completa: **200 tests pasados** (baseline `171 passed` + 29 nuevos, sin regresión).
+- `roadmap.md`: 017 movida a Hecho; Fase 6 iniciada; siguiente es 018 (CI/CD y operación).
