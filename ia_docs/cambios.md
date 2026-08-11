@@ -2,6 +2,13 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-11 · Fix conexión al transaction pooler de Supabase
+
+- La app no arrancaba con el `DATABASE_URL` del pooler de Supabase: la URL trae `?pgbouncer=true`, opción que psycopg2/libpq rechaza (`sqlalchemy.exc.ProgrammingError: invalid dsn: invalid connection option "pgbouncer"`). (Ya documentado para la nube en el entry del 2026-08-09, ahora resuelto en código.)
+- `app/database.py` — nueva función `_build_database_url()` que sanitiza la URL antes de construir el engine: elimina las opciones de DSN `pgbouncer` y `connection_limit` (agregadas por el transaction pooler) cuando el driver es PostgreSQL. La nube ya usa el pooler de sesión, así que el fix no cambia su comportamiento.
+- Verificado: `GET /health` → `{"status":"ok","version":"0.1.1"}`; suite completa **224 tests pasados**.
+- **Release `v0.1.1`** — bumpeo `__version__` (0.1.0 → 0.1.1, patch) y deploy a FastAPI Cloud (`https://auto-help-desk.fastapicloud.dev`). — `main`
+
 ## 2026-08-09 · Despliegue a FastAPI Cloud
 
 - Despliegue real en **FastAPI Cloud** (app `auto-help-desk`, URL `https://auto-help-desk.fastapicloud.dev`), cuenta `julieta.raw@gmail.com`.
