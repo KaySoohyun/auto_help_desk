@@ -10,12 +10,14 @@ from app.api.routes_pii import router as pii_router
 from app.api.routes_tickets import router as tickets_router
 from app.api.routes_workspace import router as workspace_router
 from app.core.config import settings
+from app.core.error_handlers import register_error_handlers
 from app.core.observability import MetricsMiddleware
 from app.database import Base, engine
 
 app = FastAPI(title=settings.app_name)
 
 app.add_middleware(MetricsMiddleware)
+register_error_handlers(app)
 
 app.include_router(auth_router)
 app.include_router(admin_router)

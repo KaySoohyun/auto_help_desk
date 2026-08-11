@@ -2,6 +2,17 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-11 · Mensajes de error automáticos de FastAPI en español
+
+- FastAPI/Pydantic generan mensajes de error en inglés por defecto (validación 422, 404, 405, 500, etc.). Se agregaron handlers globales para que la API responda en español sin cambiar la estructura de la respuesta.
+- `app/core/error_handlers.py` (nuevo) — `register_error_handlers()` con tres handlers:
+  - `RequestValidationError` → 422 con `msg` traducido (ej. "Field required" → "Campo requerido", "String should have at least 8 characters" → "Debe tener al menos 8 caracteres", enum → "Debe ser '...' o '...'"); se conservan `loc`, `type` y `ctx`, y los mensajes de validadores custom ya en español se mantienen.
+  - `HTTPException` → traduce solo los `detail` por defecto de Starlette ("Not Found" → "No encontrado", "Method Not Allowed" → "Método no permitido", etc.); los `detail` propios en español se devuelven intactos (ej. "Token inválido").
+  - `Exception` → 500 genérico "Error interno del servidor" con log de la excepción.
+- `app/main.py` — se registra `register_error_handlers(app)`.
+- Tests: `tests/test_error_handlers.py` (nuevo, 5 casos). Suite completa **229 tests pasados**.
+- Sin cambios en los mensajes propios (ya estaban en español).
+
 ## 2026-08-11 · Fix conexión al transaction pooler de Supabase
 
 - La app no arrancaba con el `DATABASE_URL` del pooler de Supabase: la URL trae `?pgbouncer=true`, opción que psycopg2/libpq rechaza (`sqlalchemy.exc.ProgrammingError: invalid dsn: invalid connection option "pgbouncer"`). (Ya documentado para la nube en el entry del 2026-08-09, ahora resuelto en código.)
