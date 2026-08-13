@@ -197,6 +197,7 @@ class LLMOrchestrator:
                     model=model or self._model or settings.llm_effective_model,
                     max_tokens=settings.llm_max_tokens,
                     temperature=temperature,
+                    task=task,
                 )
             except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as exc:
                 retries += 1

@@ -2,6 +2,15 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-13 · Fix consistencia total/items en listado de tickets (Hallazgo 4)
+
+- `TicketRepository.list` (`app/repositories/tickets.py:166`) ejecutaba `count` y `select` en dos statements separados, lo que bajo escrituras concurrentes podía generar desfase entre `total` y `items` (observado 17 vs 18 en tests funcionales del frontend).
+- Fix: query única con window function `COUNT(*) OVER()` para obtener `total` de la misma snapshot que los `items`, con fallback a `count` separado cuando `offset` supera el total (rows vacío).
+- Tests agregados en `tests/test_tickets.py`:
+  - `test_list_tickets_offset_beyond_total_returns_correct_count`: valida el fallback cuando offset > total.
+  - `test_list_tickets_total_consistency`: valida que `total >= len(items)` y que el total refleje la cantidad real.
+- Suite completa: **236 tests pasados** (229 originales + 2 nuevos + 5 de error handlers, sin regresión).
+
 ## 2026-08-11 · Mensajes de error automáticos de FastAPI en español
 
 - FastAPI/Pydantic generan mensajes de error en inglés por defecto (validación 422, 404, 405, 500, etc.). Se agregaron handlers globales para que la API responda en español sin cambiar la estructura de la respuesta.

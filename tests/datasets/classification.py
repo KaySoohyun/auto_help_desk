@@ -85,7 +85,7 @@ class MockClassifyProvider:
         self._confidence = confidence
         self._warnings = warnings or []
 
-    def complete(self, *, messages, model, max_tokens, temperature=0) -> LLMResponse:
+    def complete(self, *, messages, model, max_tokens, temperature=0, task=None) -> LLMResponse:
         case = self._case
         content = json.dumps({
             "category": case["expected_category"],

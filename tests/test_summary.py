@@ -105,6 +105,20 @@ def test_summary_success(client: TestClient, summary_provider) -> None:
     assert body["trace_id"]
 
 
+def test_summary_success_with_default_mock(client: TestClient) -> None:
+    """E2E con el proveedor mock por defecto (sin inyectar): el mock task-aware
+    debe devolver un JSON que el parser del resumen acepte."""
+    tokens = register_login(client, "e2e-sum@example.com", "agent", "ten")
+    ticket = _create_ticket(client, tokens)
+    resp = _summarize(client, tokens, ticket["id"])
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["summary"]
+    assert body["confidence"] == 0.9
+    assert body["suggestion_id"] > 0
+    assert body["trace_id"]
+
+
 def test_summary_requires_token(client: TestClient) -> None:
     assert client.post("/v1/ai/tickets/1/summary").status_code == 401
 

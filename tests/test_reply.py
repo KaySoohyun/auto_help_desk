@@ -111,6 +111,20 @@ def test_reply_success(client: TestClient, reply_provider) -> None:
     assert body["trace_id"]
 
 
+def test_reply_success_with_default_mock(client: TestClient) -> None:
+    """E2E con el proveedor mock por defecto (sin inyectar): el mock task-aware
+    debe devolver un JSON que el parser de sugerencia de respuesta acepte."""
+    tokens = register_login(client, "e2e-reply@example.com", "agent", "ten")
+    ticket = _create_ticket(client, tokens)
+    resp = _suggest(client, tokens, ticket["id"])
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["suggested_reply"]
+    assert body["confidence"] == 0.9
+    assert body["suggestion_id"] > 0
+    assert body["trace_id"]
+
+
 def test_reply_with_tone_and_language(client: TestClient, reply_provider) -> None:
     reply_provider(ReplyMock())
     tokens = register_login(client, "agent-tone@example.com", "agent", "ten")

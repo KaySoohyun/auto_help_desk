@@ -26,7 +26,7 @@ class MockReplyProvider:
         self._confidence = confidence
         self._warnings = warnings
 
-    def complete(self, *, messages, model, max_tokens, temperature=0) -> LLMResponse:
+    def complete(self, *, messages, model, max_tokens, temperature=0, task=None) -> LLMResponse:
         content = json.dumps({
             "suggestedReply": self._reply,
             "confidence": self._confidence,

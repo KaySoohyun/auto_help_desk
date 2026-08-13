@@ -6,6 +6,7 @@ Chat Completions. Implementaciones HTTP real y mock (para dev/tests).
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -51,8 +52,14 @@ class BaseLLMProvider(Protocol):
         model: str,
         max_tokens: int,
         temperature: float = 0,
+        task: str | None = None,
     ) -> LLMResponse:
-        """Ejecuta una llamada de chat y devuelve la respuesta."""
+        """Ejecuta una llamada de chat y devuelve la respuesta.
+
+        `task` identifica la salida estructurada esperada (p. ej. `classify`,
+        `summary`, `reply`); los proveedores reales lo ignoran (el prompt ya lo
+        describe) y los mocks lo usan para devolver JSON válido por tarea.
+        """
 
 
 def _openai_payload(messages: list[dict[str, str]], model: str, max_tokens: int, temperature: float) -> dict[str, Any]:
@@ -86,6 +93,7 @@ class HTTPLLMProvider:
         model: str,
         max_tokens: int,
         temperature: float = 0,
+        task: str | None = None,
     ) -> LLMResponse:
         started = time.perf_counter()
         headers = {"Authorization": f"Bearer {self._api_key}"}
@@ -129,6 +137,47 @@ class MockLLMProvider:
     def calls(self) -> int:
         return self._calls
 
+    @staticmethod
+    def _mock_content(task: str | None) -> str:
+        """JSON válido por tarea para que los parsers reales lo acepten.
+
+        Devuelve salidas estructuralmente correctas (campos que validan
+        `classifier`/`summarizer`/`reply_suggester`). El caso default preserva el
+        comportamiento histórico `{"ok": true, "task": "mock"}`.
+        """
+        if task == "classify":
+            return json.dumps(
+                {
+                    "category": "technical",
+                    "subcategory": "login",
+                    "intent": "incident",
+                    "suggestedPriority": "high",
+                    "confidence": 0.9,
+                    "rationale": "Falla reportada en autenticación (mock determinista).",
+                    "warnings": [],
+                }
+            )
+        if task == "summary":
+            return json.dumps(
+                {
+                    "summary": "Resumen determinista de prueba (mock): problema de autenticación reportado.",
+                    "missingInformation": None,
+                    "confidence": 0.9,
+                    "warnings": [],
+                }
+            )
+        if task == "reply":
+            return json.dumps(
+                {
+                    "suggestedReply": "Respuesta determinista de prueba (mock): pedir pasos de reproducción.",
+                    "confidence": 0.9,
+                    "sources": [],
+                    "policyFlags": [],
+                    "warnings": [],
+                }
+            )
+        return '{"ok": true, "task": "mock"}'
+
     def complete(
         self,
         *,
@@ -136,6 +185,7 @@ class MockLLMProvider:
         model: str,
         max_tokens: int,
         temperature: float = 0,
+        task: str | None = None,
     ) -> LLMResponse:
         started = time.perf_counter()
         user_message = messages[-1]["content"] if messages else ""
@@ -143,7 +193,7 @@ class MockLLMProvider:
         if failure_reached:
             raise httpx.TimeoutException("mock timeout")
         self._calls += 1
-        content = '{"ok": true, "task": "mock"}'
+        content = self._mock_content(task)
         return LLMResponse(
             content=content,
             model=model or self.model,

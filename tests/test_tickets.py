@@ -172,6 +172,38 @@ def test_sensitive_fields_are_encrypted_at_rest(client: TestClient) -> None:
     assert raw_body.startswith("cipher:")
 
 
+def test_list_tickets_offset_beyond_total_returns_correct_count(client: TestClient) -> None:
+    tokens = register_login(client, "agent-offset@example.com", "agent", "ten-a")
+    _create_ticket(client, tokens, subject="Ticket 1")
+    _create_ticket(client, tokens, subject="Ticket 2")
+    _create_ticket(client, tokens, subject="Ticket 3")
+    response = client.get(
+        "/v1/tickets",
+        headers=_headers(tokens),
+        params={"limit": 10, "offset": 100},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert len(body["items"]) == 0
+
+
+def test_list_tickets_total_consistency(client: TestClient) -> None:
+    tokens = register_login(client, "agent-consistency@example.com", "agent", "ten-a")
+    for i in range(5):
+        _create_ticket(client, tokens, subject=f"Ticket {i}")
+    response = client.get(
+        "/v1/tickets",
+        headers=_headers(tokens),
+        params={"limit": 3, "offset": 0},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] >= len(body["items"])
+    assert body["total"] == 5
+    assert len(body["items"]) == 3
+
+
 def test_ticket_operations_are_audited(client: TestClient) -> None:
     tokens = register_login(client, "agent-i@example.com", "agent", "ten-a")
     created = _create_ticket(client, tokens)

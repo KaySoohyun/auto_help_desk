@@ -40,6 +40,23 @@ def test_mock_provider_returns_deterministic_content() -> None:
     assert response.duration_seconds >= 0
 
 
+def test_mock_provider_is_task_aware() -> None:
+    import json
+
+    provider = MockLLMProvider()
+    cases = {
+        "classify": {"category", "intent", "suggestedPriority"},
+        "summary": {"summary"},
+        "reply": {"suggestedReply"},
+    }
+    for task, required in cases.items():
+        response = provider.complete(messages=[{"role": "user", "content": "test"}], model="m", max_tokens=100, task=task)
+        data = json.loads(response.content)
+        assert isinstance(data, dict)
+        for field in required:
+            assert data.get(field), f"tarea {task}: falta campo {field!r}"
+
+
 def test_orchestrator_success_and_metrics() -> None:
     metrics.reset()
     orchestrator = LLMOrchestrator(provider=MockLLMProvider(), rate_limit=RateLimitStore())

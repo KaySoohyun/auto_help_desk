@@ -118,3 +118,25 @@ def test_total_count_with_filters(client: TestClient) -> None:
     assert body["total"] == 4
     assert len(body["items"]) == 4
     assert all(t["status"] == "open" for t in body["items"])
+
+
+def test_total_fallback_when_offset_beyond_result_set(client: TestClient) -> None:
+    tokens = register_login(client, "agent@example.com", "agent", "ten")
+    for i in range(3):
+        _create_ticket(client, tokens, description=f"Ticket {i}")
+
+    # offset mayor al total: sin filas, el window function no devuelve total;
+    # el fallback de count debe preservar el total real con los mismos filtros.
+    resp = client.get("/v1/tickets", params={"limit": 5, "offset": 10}, headers=_headers(tokens))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+    assert body["items"] == []
+
+    resp = client.get(
+        "/v1/tickets", params={"status": "open", "limit": 5, "offset": 10}, headers=_headers(tokens)
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+    assert body["items"] == []

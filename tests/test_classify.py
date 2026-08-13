@@ -182,6 +182,19 @@ def test_classify_persists_suggestion_without_pii(client: TestClient, classify_p
         assert "cliente@example.com" not in serialized
 
 
+def test_classify_success_with_default_mock(client: TestClient) -> None:
+    """E2E con el proveedor mock por defecto (sin inyectar): el mock task-aware
+    debe devolver JSON que el parser acepte (regresión del 422 en dev)."""
+    tokens = register_login(client, "e2e-mock@example.com", "agent", "ten")
+    ticket = _create_ticket(client, tokens)
+    resp = _classify(client, tokens, ticket["id"])
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["category"] == "technical"
+    assert body["intent"] == "incident"
+    assert body["suggested_priority"] == "high"
+
+
 def test_classify_audits_and_metrics(client: TestClient, classify_provider) -> None:
     classify_provider(ClassifyMock())
     tokens = register_login(client, "audit@example.com", "agent", "ten")

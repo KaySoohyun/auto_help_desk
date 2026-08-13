@@ -163,16 +163,19 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         if date_to:
             filters.append(Ticket.created_at <= date_to)
 
-        total = self.db.scalar(select(func.count()).select_from(Ticket).where(*filters)) or 0
         stmt = (
-            select(Ticket)
+            select(Ticket, func.count().over().label("_total"))
             .where(*filters)
             .order_by(Ticket.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
-        tickets = list(self.db.scalars(stmt).all())
-        return [self._summary_view(t) for t in tickets], total
+        rows = self.db.execute(stmt).all()
+        if rows:
+            total = rows[0]._total
+        else:
+            total = self.db.scalar(select(func.count()).select_from(Ticket).where(*filters)) or 0
+        return [self._summary_view(t) for t, _ in rows], total
 
     def update(self, pk, changes: dict[str, Any]) -> TicketView | None:
         ticket = super().get_or_none(pk)

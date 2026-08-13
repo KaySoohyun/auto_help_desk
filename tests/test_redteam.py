@@ -24,7 +24,7 @@ from app.services.llm_orchestrator import LLMOrchestrator
 class EchoProvider:
     """Devuelve el contenido exacto recibido (simula un LLM 'cooperando' con el ataque)."""
 
-    def complete(self, *, messages, model, max_tokens, temperature=0) -> LLMResponse:
+    def complete(self, *, messages, model, max_tokens, temperature=0, task=None) -> LLMResponse:
         user_content = messages[-1]["content"] if messages else ""
         return LLMResponse(
             content=user_content,
@@ -37,7 +37,7 @@ class EchoProvider:
 class CleanClassifyProvider:
     """Devuelve una clasificación válida y limpia (sin PII ni contenido prohibido)."""
 
-    def complete(self, *, messages, model, max_tokens, temperature=0) -> LLMResponse:
+    def complete(self, *, messages, model, max_tokens, temperature=0, task=None) -> LLMResponse:
         content = json.dumps({
             "category": "general",
             "intent": "question",
