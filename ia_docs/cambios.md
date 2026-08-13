@@ -2,6 +2,55 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-13 · Feature 019: Base de conocimiento (KB)
+
+- Implementación completa de endpoints `/v1/kb/*` para gestionar artículos de base de conocimiento por tenant.
+- **Permisos** (`app/core/permissions.py`): nuevos `KB_READ`, `KB_EDIT`, `KB_PUBLISH`. Agent solo lee; supervisor/tenant_admin/platform_admin pueden editar y publicar.
+- **Modelos** (`app/models/kb.py`): `KbArticle` (artículo con title, body, category, status, tags, versionado), `KbArticleVersion` (snapshot por versión), `KbArticleTag` (tabla normalizada para tags).
+- **Schemas** (`app/schemas/kb.py`): `KbArticleCreate`, `KbArticleUpdate`, `KbArticleOut`, `KbArticleSummaryOut`, `KbArticleListOut`, `KbArticleVersionOut`.
+- **Repositorio** (`app/repositories/kb.py`): `KbRepository` con list (filtros status/category/tag/search), create, update (con versionado), publish/archive/restore (con validación de transiciones), list_versions.
+- **Rutas** (`app/api/routes_kb.py`): 8 endpoints (listar, crear, detalle, actualizar, publicar, archivar, restaurar, versiones). Isolación por tenant (404 si artículo no existe o es de otro tenant). Auditoría de acciones sin PII.
+- **Tests** (`tests/test_kb.py`): 23 tests (CRUD, permisos, isolación, versionado, transiciones, búsqueda, filtro por tag, auditoría).
+- **Frontend** (`tests/knowledge.test.ts`): actualizado para validar flujo completo con backend real (11 tests nuevos).
+- Suite backend: **259 tests pasados** (236 anteriores + 23 nuevos).
+- Suite frontend: **106 tests pasados** (95 anteriores + 11 nuevos).
+- Sin cifrado (los artículos no contienen PII).
+- Documentado en `ia_docs/features/019-base-conocimiento/`.
+
+## 2026-08-13 · Validación tenant_admin en suite funcional del frontend (Hallazgo 3)
+
+- Se agregó `seedTenantAdmin()` en `tests/support/client.ts` para crear usuarios `tenant_admin` directamente contra FastAPI (vía `platform_admin`).
+- Tests agregados en el frontend (`/home/kona/frontend-nextjs`):
+  - `tests/admin.test.ts`: 6 tests nuevos para `tenant_admin` (listar usuarios del propio tenant, crear usuario en su tenant, crear en otro tenant → 403, crear platform_admin → 403, editar rol, editar usuario de otro tenant → 404).
+  - `tests/audit.test.ts`: 2 tests nuevos para `tenant_admin` (leer eventos del propio tenant, filtrar por action).
+  - `tests/ai-policy.test.ts`: 3 tests nuevos para `tenant_admin` (ai-info → 200, GET policy → 200, PUT round-trip idempotente, PUT modifica ai_enabled).
+- Los tests usan tenants diferentes (`test-tenant-admin`, `test-tenant-audit`, `test-tenant-ai-policy`) para evitar interferencias.
+- Suite frontend: **95 tests pasados** (83 anteriores + 12 nuevos, sin regresión).
+
+## 2026-08-13 · Fix correlation id BFF→FastAPI (Hallazgo 5)
+
+- El BFF del frontend ahora reenvía el `x-correlation-id` del cliente como `X-Request-ID` a FastAPI, y devuelve el trace del backend en el JSON de error.
+- Cambios en el frontend (`/home/kona/frontend-nextjs`):
+  - `src/lib/api/fastapi.ts`: acepta `correlationId` en opciones, lo envía como `X-Request-ID`, lee el header de respuesta del backend y lo incluye en `ApiError.correlationId`.
+  - `src/lib/api/authenticated.ts`: lee `x-correlation-id` del request del cliente y lo pasa a `fastApiFetch`; `apiErrorResponse` incluye `correlation_id` en el JSON de error.
+  - Route Handlers corregidos para pasar `req` a `authenticatedFetch` en GET: `tickets/route.ts`, `tickets/[ticketId]/route.ts`, `tickets/[ticketId]/messages/route.ts`, `knowledge/articles/route.ts`, `knowledge/articles/[articleId]/route.ts`, `knowledge/articles/[articleId]/versions/route.ts`, `admin/users/route.ts`, `admin/ai-policy/route.ts`, `admin/ai-policies/global/route.ts`, `admin/ai-info/route.ts`, `audit/events/route.ts`, `me/route.ts`.
+- Tests:
+  - `tests/hardening.test.ts`: nuevo test `correlation-id: el error del BFF incluye el trace del backend` que verifica que el `correlation_id` del backend se incluye en el JSON de error.
+  - `tests/llm.test.ts`: actualizado para reflejar que el mock task-aware funciona (espera 200 en lugar de 422 en classify/summarize/suggest-reply/chat/stream).
+- Suite frontend: **83 tests pasados** (sin regresión).
+
+## 2026-08-13 · Fix mock LLM task-aware (Hallazgo 1)
+
+- El `MockLLMProvider.complete` (`app/services/llm.py:141-179`) ahora es "task-aware": devuelve JSON válido según la tarea (`classify`, `summary`, `reply`), permitiendo que los parsers reales (`classifier.py`, `summarizer.py`, `reply_suggester.py`) acepten la salida en dev/tests sin inyectar mocks custom.
+- `BaseLLMProvider.complete` y `HTTPLLMProvider.complete` aceptan el parámetro opcional `task: str | None = None` (los proveedores reales lo ignoran).
+- `LLMOrchestrator._complete_with_retries` (`app/services/llm_orchestrator.py:200`) pasa `task=task` al proveedor.
+- Tests de regresión:
+  - `test_mock_provider_is_task_aware` (`tests/test_llm.py:43`): unit del mock por tarea.
+  - `test_classify_success_with_default_mock` (`tests/test_classify.py:185`): E2E classify sin inyectar mock.
+  - `test_summary_success_with_default_mock` (`tests/test_summary.py:108`): E2E summary sin inyectar mock.
+  - `test_reply_success_with_default_mock` (`tests/test_reply.py:114`): E2E reply sin inyectar mock.
+- Suite completa: **236 tests pasados** (sin regresión).
+
 ## 2026-08-13 · Fix consistencia total/items en listado de tickets (Hallazgo 4)
 
 - `TicketRepository.list` (`app/repositories/tickets.py:166`) ejecutaba `count` y `select` en dos statements separados, lo que bajo escrituras concurrentes podía generar desfase entre `total` y `items` (observado 17 vs 18 en tests funcionales del frontend).

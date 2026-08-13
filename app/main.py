@@ -5,6 +5,7 @@ from app.api.routes_admin import router as admin_router
 from app.api.routes_ai import router as ai_router
 from app.api.routes_audit import router as audit_router
 from app.api.routes_auth import router as auth_router
+from app.api.routes_kb import router as kb_router
 from app.api.routes_metrics import router as metrics_router
 from app.api.routes_pii import router as pii_router
 from app.api.routes_tickets import router as tickets_router
@@ -27,6 +28,7 @@ app.include_router(pii_router)
 app.include_router(metrics_router)
 app.include_router(ai_router)
 app.include_router(workspace_router)
+app.include_router(kb_router)
 
 
 @app.on_event("startup")

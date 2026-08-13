@@ -13,12 +13,24 @@ SEND_RESPONSE = "responses:send"
 CONFIGURE_TENANT = "tenant:configure"
 VIEW_AUDIT = "audit:view"
 MANAGE_AI_POLICIES = "ai_policies:manage"
+KB_READ = "kb:read"
+KB_EDIT = "kb:edit"
+KB_PUBLISH = "kb:publish"
 
 Permission: TypeAlias = str
 
 ROLE_PERMISSIONS: dict[str, set[Permission]] = {
-    "agent": {READ_TICKETS, REQUEST_AI_SUGGESTION, EDIT_RESPONSE, SEND_RESPONSE},
-    "supervisor": {READ_TICKETS, REQUEST_AI_SUGGESTION, EDIT_RESPONSE, SEND_RESPONSE, VIEW_AUDIT},
+    "agent": {READ_TICKETS, REQUEST_AI_SUGGESTION, EDIT_RESPONSE, SEND_RESPONSE, KB_READ},
+    "supervisor": {
+        READ_TICKETS,
+        REQUEST_AI_SUGGESTION,
+        EDIT_RESPONSE,
+        SEND_RESPONSE,
+        VIEW_AUDIT,
+        KB_READ,
+        KB_EDIT,
+        KB_PUBLISH,
+    },
     "tenant_admin": {
         READ_TICKETS,
         REQUEST_AI_SUGGESTION,
@@ -26,6 +38,9 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
         SEND_RESPONSE,
         VIEW_AUDIT,
         CONFIGURE_TENANT,
+        KB_READ,
+        KB_EDIT,
+        KB_PUBLISH,
     },
     "platform_admin": {
         READ_TICKETS,
@@ -35,6 +50,9 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
         VIEW_AUDIT,
         CONFIGURE_TENANT,
         MANAGE_AI_POLICIES,
+        KB_READ,
+        KB_EDIT,
+        KB_PUBLISH,
     },
 }
 
