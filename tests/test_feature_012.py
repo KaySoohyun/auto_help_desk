@@ -14,12 +14,12 @@ def _headers(tokens: dict) -> dict[str, str]:
 
 
 def _create_tenant(tenant_id: str, name: str, slug: str) -> None:
-    """Crea un tenant en la base de datos."""
+    """Crea un tenant en la base de datos (idempotente)."""
     db = SessionLocal()
     try:
-        tenant = Tenant(id=tenant_id, name=name, slug=slug)
-        db.add(tenant)
-        db.commit()
+        if db.get(Tenant, tenant_id) is None:
+            db.add(Tenant(id=tenant_id, name=name, slug=slug))
+            db.commit()
     finally:
         db.close()
 

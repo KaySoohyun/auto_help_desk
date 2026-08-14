@@ -9,7 +9,8 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     role: UserRole
-    tenant_id: str | None = None
+    tenant_id: str | None = None  # Legacy: único tenant (compatibilidad con tests)
+    tenant_ids: list[str] = Field(default_factory=list)  # Uno o varios tenants del registro
 
 
 class LoginRequest(BaseModel):

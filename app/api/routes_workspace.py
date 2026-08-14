@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.deps import get_effective_tenant_ids
 from app.core.permissions import EDIT_RESPONSE, READ_TICKETS, require_permissions
 from app.database import get_db
 from app.models.ai_suggestion import AISuggestion
@@ -21,10 +22,8 @@ def _trace() -> str:
     return str(uuid.uuid4())
 
 
-def _repo(db: Session, user: User) -> TicketRepository:
-    if not user.tenant_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Rol sin tenant asignado")
-    return TicketRepository(db, user.tenant_id)
+def _repo(db: Session, tenant_ids: list[str]) -> TicketRepository:
+    return TicketRepository(db, tenant_ids=tenant_ids)
 
 
 def _get_ticket_or_404(repo: TicketRepository, ticket_id: int) -> None:
@@ -42,13 +41,14 @@ def record_feedback(
     ticket_id: int,
     payload: FeedbackIn,
     current_user: User = Depends(require_permissions(EDIT_RESPONSE)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_trace),
 ) -> FeedbackOut:
     """Registra la decisión del agente sobre una sugerencia de IA (spec §15.4)."""
-    _get_ticket_or_404(_repo(db, current_user), ticket_id)
-    service = FeedbackService(db, tenant_id=current_user.tenant_id, audit=audit)
+    _get_ticket_or_404(_repo(db, tenant_ids), ticket_id)
+    service = FeedbackService(db, tenant_ids=tenant_ids, audit=audit)
     try:
         feedback, _suggestion = service.record(
             payload.suggestion_id,
@@ -73,14 +73,15 @@ def record_feedback(
 def list_suggestions(
     ticket_id: int,
     current_user: User = Depends(require_permissions(READ_TICKETS)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
 ) -> list[SuggestionOut]:
     """Lista las sugerencias de IA de un ticket del tenant (spec §13.2)."""
-    _get_ticket_or_404(_repo(db, current_user), ticket_id)
+    _get_ticket_or_404(_repo(db, tenant_ids), ticket_id)
     stmt = (
         select(AISuggestion)
         .where(
-            AISuggestion.tenant_id == current_user.tenant_id,
+            AISuggestion.tenant_id.in_(tenant_ids),
             AISuggestion.ticket_id == ticket_id,
         )
         .order_by(AISuggestion.created_at.desc())
@@ -92,13 +93,14 @@ def list_suggestions(
 @router.get("/workspace/my-tickets", response_model=TicketListOut)
 def my_tickets(
     current_user: User = Depends(require_permissions(READ_TICKETS)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     status_filter: str | None = Query(default=None, alias="status", pattern="^(open|in_progress|on_hold|closed)$"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> TicketListOut:
     """Bandeja de trabajo del agente: tickets asignados a él (épica 5.2)."""
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     items, total = repo.list(
         assignee_id=current_user.id,
         status=status_filter,

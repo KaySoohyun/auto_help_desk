@@ -10,6 +10,20 @@ from app.schemas.tenant import TenantOut
 router = APIRouter(prefix="/v1/tenants", tags=["tenants"])
 
 
+@router.get("/public", response_model=list[TenantOut])
+def list_public_tenants(
+    db: Session = Depends(get_db),
+) -> list[TenantOut]:
+    """Lista tenants disponibles (id, nombre, slug) para el registro público.
+
+    Sin autenticación: el formulario de registro del portal de empresas lo usa
+    para permitir al usuario elegir uno o varios tenants a los que asociarse.
+    No expone datos sensibles.
+    """
+    tenants = db.query(Tenant).order_by(Tenant.name.asc()).all()
+    return [TenantOut.model_validate(tenant) for tenant in tenants]
+
+
 @router.get("", response_model=list[TenantOut])
 def list_tenants(
     current_user: User = Depends(require_permissions(VIEW_AUDIT)),

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.categories import TICKET_CATEGORIES
+from app.core.deps import get_effective_tenant_ids
 from app.core.permissions import EDIT_RESPONSE, READ_TICKETS, SEND_RESPONSE, require_permissions
 from app.core.metrics import metrics
 from app.database import get_db
@@ -35,13 +36,8 @@ def list_categories() -> list[dict[str, str]]:
     return TICKET_CATEGORIES
 
 
-def _repo(db: Session, user: User) -> TicketRepository:
-    if not user.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Rol sin tenant asignado",
-        )
-    return TicketRepository(db, user.tenant_id)
+def _repo(db: Session, tenant_ids: list[str]) -> TicketRepository:
+    return TicketRepository(db, tenant_ids=tenant_ids)
 
 
 def _get_or_404(repo: TicketRepository, ticket_id: int):
@@ -80,11 +76,12 @@ def _audit(
 def create_ticket(
     payload: TicketCreate,
     current_user: User = Depends(require_permissions(READ_TICKETS, EDIT_RESPONSE)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_get_trace_id),
 ) -> TicketView:
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     ticket = repo.create(
         subject=payload.subject,
         description=payload.description,
@@ -100,15 +97,17 @@ def create_ticket(
 def get_ticket(
     ticket_id: int,
     current_user: User = Depends(require_permissions(READ_TICKETS)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
 ) -> TicketView:
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     return _get_or_404(repo, ticket_id)
 
 
 @router.get("", response_model=TicketListOut)
 def list_tickets(
     current_user: User = Depends(require_permissions(READ_TICKETS)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     status_filter: str | None = Query(default=None, alias="status", pattern="^(open|in_progress|on_hold|closed)$"),
     category: str | None = Query(default=None, max_length=100),
@@ -119,7 +118,7 @@ def list_tickets(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> TicketListOut:
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     items, total = repo.list(
         status=status_filter,
         category=category,
@@ -138,6 +137,7 @@ def update_ticket(
     ticket_id: int,
     payload: TicketUpdate,
     current_user: User = Depends(require_permissions(EDIT_RESPONSE, SEND_RESPONSE)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_get_trace_id),
@@ -146,7 +146,7 @@ def update_ticket(
     if not changes:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Sin cambios")
     try:
-        ticket = _repo(db, current_user).update(ticket_id, changes)
+        ticket = _repo(db, tenant_ids).update(ticket_id, changes)
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
     if ticket is None:
@@ -160,11 +160,12 @@ def add_message(
     ticket_id: int,
     payload: TicketMessageIn,
     current_user: User = Depends(require_permissions(EDIT_RESPONSE)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_get_trace_id),
 ) -> TicketMessageOut:
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     ticket = _get_or_404(repo, ticket_id)
     if ticket.status == "closed":
         raise HTTPException(
@@ -180,9 +181,10 @@ def add_message(
 def list_messages(
     ticket_id: int,
     current_user: User = Depends(require_permissions(READ_TICKETS)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
 ) -> list[TicketMessageOut]:
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     _get_or_404(repo, ticket_id)
     messages = repo.list_messages(ticket_id)
     return [TicketMessageOut.model_validate(m) for m in messages]
@@ -192,12 +194,13 @@ def list_messages(
 def close_ticket(
     ticket_id: int,
     current_user: User = Depends(require_permissions(SEND_RESPONSE)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_get_trace_id),
 ) -> TicketView:
     try:
-        ticket = _repo(db, current_user).update(ticket_id, {"status": "closed"})
+        ticket = _repo(db, tenant_ids).update(ticket_id, {"status": "closed"})
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
     if ticket is None:
@@ -217,10 +220,11 @@ from app.schemas.tag import TagOut
 def list_ticket_tags(
     ticket_id: int,
     current_user: User = Depends(require_permissions(READ_TICKETS)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
 ) -> list[TagOut]:
     """Lista los tags de un ticket."""
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     _get_or_404(repo, ticket_id)
     
     # Obtener tags del ticket
@@ -239,12 +243,13 @@ def add_ticket_tag(
     ticket_id: int,
     payload: dict,
     current_user: User = Depends(require_permissions(EDIT_RESPONSE)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_get_trace_id),
 ) -> dict:
     """Agrega un tag a un ticket."""
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     _get_or_404(repo, ticket_id)
     
     tag_id = payload.get("tag_id")
@@ -254,8 +259,8 @@ def add_ticket_tag(
             detail="tag_id es requerido",
         )
     
-    # Verificar que el tag existe y pertenece al tenant
-    tag = db.query(Tag).filter(Tag.id == tag_id, Tag.tenant_id == current_user.tenant_id).first()
+    # Verificar que el tag existe y pertenece a uno de los tenants del usuario
+    tag = db.query(Tag).filter(Tag.id == tag_id, Tag.tenant_id.in_(tenant_ids)).first()
     if not tag:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -288,12 +293,13 @@ def remove_ticket_tag(
     ticket_id: int,
     tag_id: int,
     current_user: User = Depends(require_permissions(EDIT_RESPONSE)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_get_trace_id),
 ) -> None:
     """Quita un tag de un ticket."""
-    repo = _repo(db, current_user)
+    repo = _repo(db, tenant_ids)
     _get_or_404(repo, ticket_id)
     
     # Buscar la asociación

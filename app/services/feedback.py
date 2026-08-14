@@ -45,9 +45,17 @@ class AuditPort(Protocol):
 class FeedbackService:
     """Registra feedback del agente y actualiza el estado de la sugerencia."""
 
-    def __init__(self, db: Session, *, tenant_id: str | None, audit: AuditPort | None = None) -> None:
+    def __init__(
+        self,
+        db: Session,
+        *,
+        tenant_id: str | None = None,
+        tenant_ids: list[str] | None = None,
+        audit: AuditPort | None = None,
+    ) -> None:
         self._db = db
-        self._tenant_id = tenant_id
+        self._tenant_ids = list(dict.fromkeys(tenant_ids or ([tenant_id] if tenant_id else [])))
+        self._tenant_id = self._tenant_ids[0] if self._tenant_ids else None
         self._audit = audit
 
     def record(
@@ -62,27 +70,28 @@ class FeedbackService:
     ) -> tuple[Feedback, AISuggestion]:
         """Registra el feedback y actualiza el estado de la sugerencia.
 
-        Sugerencia de otro tenant o inexistente → `PermissionError`.
+        Sugerencia fuera del alcance del usuario o inexistente → `PermissionError`.
         """
-        if self._tenant_id is None:
+        if not self._tenant_ids:
             raise PermissionError("Tenant no definido")
 
         suggestion = self._db.scalar(
             select(AISuggestion).where(
                 AISuggestion.id == suggestion_id,
-                AISuggestion.tenant_id == self._tenant_id,
+                AISuggestion.tenant_id.in_(self._tenant_ids),
             )
         )
         if suggestion is None:
             raise PermissionError("Sugerencia no encontrada")
 
+        tenant_id = suggestion.tenant_id
         feedback = self._db.scalar(
             select(Feedback).where(Feedback.suggestion_id == suggestion_id)
         )
         if feedback is None:
             feedback = Feedback(
                 suggestion_id=suggestion_id,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 action=action,
                 reason=reason,
                 edited_content_hash=edited_content_hash,
@@ -103,7 +112,7 @@ class FeedbackService:
             self._audit.log(
                 "ai.feedback",
                 user_id=user_id,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 service="ai",
                 model="AISuggestion",
                 trace_id=trace_id,

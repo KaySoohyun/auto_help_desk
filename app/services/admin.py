@@ -49,10 +49,18 @@ class AuditPort(Protocol):
 class AdminService:
     """Lógica de negocio de la consola de administración."""
 
-    def __init__(self, db: Session, *, current_user: User, audit: AuditPort | None = None) -> None:
+    def __init__(
+        self,
+        db: Session,
+        *,
+        current_user: User,
+        audit: AuditPort | None = None,
+        tenant_ids: list[str] | None = None,
+    ) -> None:
         self._db = db
         self._user = current_user
         self._audit = audit
+        self._tenant_ids = tenant_ids or []
 
     # -- helpers -----------------------------------------------------------
 
@@ -61,19 +69,25 @@ class AdminService:
         return self._user.role == PLATFORM_ADMIN
 
     def _require_tenant(self) -> str:
-        if not self._user.tenant_id:
+        """Tenant único requerido para operaciones tenant-scoped de escritura."""
+        if len(self._tenant_ids) == 1:
+            return self._tenant_ids[0]
+        if len(self._tenant_ids) > 1:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Rol sin tenant asignado",
+                detail="Seleccioná un tenant para esta operación",
             )
-        return self._user.tenant_id
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Rol sin tenant asignado",
+        )
 
     def _log_audit(self, action_name: str, detail: dict[str, Any] | None, *, user_id: int | None = None) -> None:
         if self._audit is not None:
             self._audit.log(
                 action_name,
                 user_id=user_id,
-                tenant_id=self._user.tenant_id,
+                tenant_id=self._tenant_ids[0] if self._tenant_ids else self._user.tenant_id,
                 service="admin",
                 result="success",
                 detail=detail,

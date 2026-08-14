@@ -11,17 +11,30 @@ from app.repositories.base import TenantScopedRepository
 
 
 class KbRepository(TenantScopedRepository[KbArticle]):
-    def __init__(self, db: Session, tenant_id: str) -> None:
-        super().__init__(db, KbArticle, tenant_id)
+    """Repositorio de artículos KB con alcance de uno o varios tenants."""
 
-    def _get_or_create_tag(self, tag_name: str) -> Tag:
-        """Obtiene o crea un tag por nombre para el tenant actual."""
+    def __init__(
+        self,
+        db: Session,
+        tenant_id: str | None = None,
+        tenant_ids: list[str] | None = None,
+    ) -> None:
+        self.tenant_ids = list(dict.fromkeys(tenant_ids or ([tenant_id] if tenant_id else [])))
+        self.tenant_id = self.tenant_ids[0] if self.tenant_ids else ""
+        super().__init__(db, KbArticle, self.tenant_id)
+
+    def _assert_tenant(self, obj: KbArticle) -> None:
+        if getattr(obj, self.tenant_id_attr) not in self.tenant_ids:
+            raise PermissionError("Recurso de otro tenant")
+
+    def _get_or_create_tag(self, tag_name: str, tenant_id: str) -> Tag:
+        """Obtiene o crea un tag por nombre para el tenant del artículo."""
         tag = self.db.query(Tag).filter(
-            Tag.tenant_id == self.tenant_id,
+            Tag.tenant_id == tenant_id,
             Tag.name == tag_name
         ).first()
         if not tag:
-            tag = Tag(tenant_id=self.tenant_id, name=tag_name)
+            tag = Tag(tenant_id=tenant_id, name=tag_name)
             self.db.add(tag)
             self.db.flush()
         return tag
@@ -36,8 +49,10 @@ class KbRepository(TenantScopedRepository[KbArticle]):
 
     def set_tags(self, article_id: int, tags: list[str]) -> None:
         self.db.execute(delete(KbArticleTag).where(KbArticleTag.article_id == article_id))
+        article = self.db.get(KbArticle, article_id)
+        tenant_id = article.tenant_id if article is not None else self.tenant_id
         for tag_name in tags:
-            tag = self._get_or_create_tag(tag_name)
+            tag = self._get_or_create_tag(tag_name, tenant_id)
             self.db.add(KbArticleTag(article_id=article_id, tag_id=tag.id))
         self.db.flush()
 
@@ -73,7 +88,7 @@ class KbRepository(TenantScopedRepository[KbArticle]):
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[dict], int]:
-        filters = [KbArticle.tenant_id == self.tenant_id]
+        filters = [KbArticle.tenant_id.in_(self.tenant_ids)]
         if status:
             filters.append(KbArticle.status == status)
         if category:
@@ -83,7 +98,7 @@ class KbRepository(TenantScopedRepository[KbArticle]):
             tag_subq = (
                 select(KbArticleTag.article_id)
                 .join(Tag, KbArticleTag.tag_id == Tag.id)
-                .where(Tag.name == tag, Tag.tenant_id == self.tenant_id)
+                .where(Tag.name == tag, Tag.tenant_id.in_(self.tenant_ids))
             )
             filters.append(KbArticle.id.in_(tag_subq))
         if search:

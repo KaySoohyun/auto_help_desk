@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_token_tenant_id
 from app.core.security import (
     TOKEN_TYPE_REFRESH,
     TokenError,
@@ -60,28 +60,36 @@ def _get_user_tenants(user: User, db: Session) -> list[TenantInfo]:
     return tenants
 
 
-def _user_to_user_out(user: User, db: Session) -> UserOut:
-    """Convierte un User a UserOut incluyendo la lista de tenants."""
+def _user_to_user_out(user: User, db: Session, active_tenant_id: str | None = None) -> UserOut:
+    """Convierte un User a UserOut incluyendo la lista de tenants.
+
+    `active_tenant_id` refleja el tenant activo de la sesión (JWT). Si es None se usa
+    el tenant principal legacy del usuario.
+    """
     tenants = _get_user_tenants(user, db)
     return UserOut(
         id=user.id,
         email=user.email,
         role=user.role,
-        tenant_id=user.tenant_id,
+        tenant_id=active_tenant_id if active_tenant_id is not None else user.tenant_id,
         is_active=user.is_active,
         created_at=user.created_at,
         tenants=tenants
     )
 
 
-def _issue_tokens(user: User, db: Session, tenant_id: str | None = None) -> TokenResponse:
+def _issue_tokens(user: User, db: Session, tenant_id: str | None = None, force_no_tenant: bool = False) -> TokenResponse:
     """Emite tokens para un usuario, opcionalmente para un tenant específico."""
     jti = str(uuid.uuid4())
     access_expires = timedelta(minutes=settings.access_token_expire_minutes)
     refresh_expires = timedelta(days=settings.refresh_token_expire_days)
 
-    # Si no se especifica tenant_id, usar el tenant principal del usuario
-    effective_tenant_id = tenant_id or user.tenant_id or ""
+    # Si no se especifica tenant_id, usar el tenant principal del usuario.
+    # `force_no_tenant` emite tokens sin tenant (el usuario ve todos sus tenants).
+    if force_no_tenant:
+        effective_tenant_id = ""
+    else:
+        effective_tenant_id = tenant_id or user.tenant_id or ""
     
     # Obtener el rol del usuario en el tenant específico
     role = user.role
@@ -137,29 +145,42 @@ def register(
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El email ya está registrado")
 
+    # Tenants del registro: dedupe de tenant_ids + tenant_id legacy.
+    tenant_ids = list(dict.fromkeys(payload.tenant_ids or ([payload.tenant_id] if payload.tenant_id else [])))
+    for tenant_id in tenant_ids:
+        if db.get(Tenant, tenant_id) is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant no encontrado: {tenant_id}",
+            )
+
+    # Si hay un solo tenant, se usa como tenant principal (legacy). Con varios, sin
+    # principal: al loguearse sin seleccionar tenant el usuario ve todos sus tenants.
+    primary_tenant_id = tenant_ids[0] if len(tenant_ids) == 1 else None
+
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),
         role=payload.role,
-        tenant_id=payload.tenant_id,
+        tenant_id=primary_tenant_id,
         is_active=True,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-    
-    # Si se especificó un tenant_id, crear la membresía en user_tenants
-    if payload.tenant_id:
+
+    if tenant_ids:
         repo = UserTenantRepository(db)
-        repo.create(user.id, payload.tenant_id, payload.role)
-    
+        for tenant_id in tenant_ids:
+            repo.create(user.id, tenant_id, payload.role)
+
     audit.log(
         "auth.user_registered",
         user_id=user.id,
         tenant_id=user.tenant_id,
         service="auth",
         result="success",
-        detail={"role": user.role},
+        detail={"role": user.role, "tenant_ids": tenant_ids},
     )
     return _user_to_user_out(user, db)
 
@@ -287,17 +308,18 @@ def logout(
 @router.get("/me", response_model=UserOut)
 def me(
     user: User = Depends(get_current_user),
+    active_tenant_id: str | None = Depends(get_token_tenant_id),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> UserOut:
     audit.log(
         "auth.access_me",
         user_id=user.id,
-        tenant_id=user.tenant_id,
+        tenant_id=active_tenant_id or user.tenant_id,
         service="auth",
         result="success",
     )
-    return _user_to_user_out(user, db)
+    return _user_to_user_out(user, db, active_tenant_id=active_tenant_id)
 
 
 @router.post("/switch-tenant", response_model=TokenResponse)
@@ -344,3 +366,20 @@ def list_user_tenants(
 ) -> list[TenantInfo]:
     """Lista todos los tenants a los que pertenece el usuario autenticado."""
     return _get_user_tenants(user, db)
+
+
+@router.post("/clear-tenant", response_model=TokenResponse)
+def clear_tenant(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> TokenResponse:
+    """Elimina la selección de tenant activo: el usuario ve los tickets de todos sus tenants."""
+    audit.log(
+        "auth.clear_tenant",
+        user_id=user.id,
+        tenant_id=None,
+        service="auth",
+        result="success",
+    )
+    return _issue_tokens(user, db, force_no_tenant=True)

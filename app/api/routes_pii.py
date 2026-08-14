@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.deps import get_token_tenant_id
 from app.core.permissions import REQUEST_AI_SUGGESTION, require_permissions
 from app.database import get_db
 from app.models.user import User
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/v1/pii", tags=["pii"])
 def redact_text(
     payload: PIIRedactRequest,
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    active_tenant_id: str | None = Depends(get_token_tenant_id),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> PIIRedactResponse:
@@ -33,7 +35,7 @@ def redact_text(
     audit.log(
         "pii.redacted",
         user_id=current_user.id,
-        tenant_id=current_user.tenant_id,
+        tenant_id=active_tenant_id,
         service="pii",
         model="PiiRedactor",
         trace_id=str(uuid.uuid4()),

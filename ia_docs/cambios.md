@@ -2,6 +2,36 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-14 · Scope efectivo en LLM, workspace, admin, auditoría, KB y customers
+
+- **`app/core/deps.py`**: nueva dependency `get_effective_tenant_ids_optional` (devuelve `[]` en vez de 403) para rutas de administración donde `platform_admin` (sin tenant) opera a nivel plataforma.
+- **Servicios LLM ticket-scoped** (`classifier.py`, `summarizer.py`, `reply_suggester.py`, `analyze.py`): aceptan `tenant_ids` (lista) y derivan el tenant efectivo **del ticket** (`ticket.tenant_id`) para `AISuggestion`, orquestador y auditoría. Soportan alcance de varios tenants (usuario que salteó la selección).
+- **`routes_ai.py`**: `classify`, `summary`, `suggested-reply` y `analyze` usan `get_effective_tenant_ids`.
+- **Workspace** (`routes_workspace.py` + `services/feedback.py`): `my-tickets`, `suggestions` y `feedback` usan el scope efectivo (`IN (tenant_ids)`); `FeedbackService` acepta `tenant_ids` y usa el tenant de la sugerencia.
+- **KB** (`repositories/kb.py` + `routes_kb.py`): `KbRepository` soporta `tenant_ids`; `set_tags` crea tags en el tenant del artículo. Rutas usan scope efectivo; auditoría scoped al primer tenant del alcance.
+- **Customers** (`routes_customers.py`): listado y detalle filtran por `IN (tenant_ids)`.
+- **Auditoría** (`routes_audit.py`): `GET /audit/events` filtra por `IN (tenant_ids)`.
+- **Administración** (`services/admin.py` + `routes_admin.py`): `AdminService` recibe `tenant_ids`; `_require_tenant` pide un tenant único (403 si hay varios o ninguno). `list_tenant_users` usa scope efectivo (403 sin tenant); crear/editar usuarios y políticas usan `get_effective_tenant_ids_optional` para no romper a `platform_admin` (a nivel plataforma).
+- **PII** (`routes_pii.py`): auditoría usa el tenant activo del token.
+- **Tests**: suite backend completa **285 passed** sin regresión.
+
+## 2026-08-14 · Fix flujo multi-tenant (portal empresas) y dashboard
+
+- **Migración de esquema** (`scripts/migrate_tickets_customer_id.py`, `scripts/migrate_kb_article_tags.py`):
+  - `tickets.customer_id` (FK a customers.id) faltaba en bases existentes → todo `/v1/tickets` devolvía 500.
+  - `tickets.language` era NOT NULL sin default (columna que el modelo ya no usa) → los INSERT fallaban. Se le dio default `'es'`.
+  - `kb_article_tags.tag` (string legacy) → `tag_id` FK a `tags.id` (Feature 019) → todas las operaciones KB devolvían 500.
+- **Alcance de tenant desde el JWT** (`app/core/deps.py`):
+  - `get_effective_tenant_ids`: si el token trae `tenant_id` → se usa ese único tenant (validando membresía o tenant legacy); si no trae (el usuario salteó la selección) → **todos** los tenants del usuario (`user_tenants`, fallback `users.tenant_id`). 403 solo si no tiene ningún tenant.
+  - `get_token_tenant_id`: devuelve el tenant activo del JWT sin fallar si es vacío.
+- **Tickets multi-tenant** (`app/repositories/tickets.py` + `app/api/routes_tickets.py`): `TicketRepository` acepta `tenant_ids`; listado, detalle, mensajes y tags filtran por `IN (tenant_ids)`. `_repo` usa el scope efectivo en lugar de `users.tenant_id`.
+- **Dashboard real** (`app/api/routes_dashboard.py` + `app/schemas/dashboard.py`): `GET /v1/dashboard` con KPIs SQL sobre el scope del usuario (asignados a mí, abiertos, sin asignar, SLA en riesgo con ventana fija de 48h).
+- **Registro con varios tenants** (`app/schemas/auth.py` + `app/api/routes_auth.py`): `RegisterRequest.tenant_ids` crea múltiples membresías. Con un solo tenant se setea `users.tenant_id` (primary, "ingreso directo"); con varios no hay primary (al saltar la selección ve todos). Valida que los tenants existan.
+- **`/auth/me` refleja el tenant activo**: `me` devuelve el `tenant_id` del JWT (no el campo legacy) vía `get_token_tenant_id`.
+- **`POST /auth/clear-tenant`**: emite tokens sin tenant activo (vuelve a "todos los tenants").
+- **`GET /v1/tenants/public`**: lista pública de tenants (id, name, slug) para el formulario de registro.
+- **Tests**: `tests/test_multi_tenant_scope.py` (9 tests) cubre registro multi-tenant, scope de tickets por tenant activo/todos, dashboard y tenants públicos. Suite completa: **285 passed**. Conftest siembra los tenants usados por las suites (el registro valida existencia).
+
 ## 2026-08-14 · Multi-tenant real implementado
 
 - **Modelo nuevo**: `UserTenant` (`app/models/user_tenant.py`) - Relación many-to-many entre usuarios y tenants con rol específico por tenant

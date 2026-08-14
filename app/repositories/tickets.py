@@ -56,12 +56,28 @@ class MessageView:
 
 
 class TicketRepository(TenantScopedRepository[Ticket]):
-    """Repositorio de tickets con cifrado en reposo y filtro por tenant (ADR-001)."""
+    """Repositorio de tickets con cifrado en reposo y filtro por tenant (ADR-001).
+
+    Soporta alcance de un único tenant (`tenant_id`) o de varios (`tenant_ids`),
+    para el caso en que el usuario no seleccionó tenant y ve tickets de todos sus
+    tenants.
+    """
 
     _SENSITIVE = ("subject", "description")
 
-    def __init__(self, db: Session, tenant_id: str) -> None:
-        super().__init__(db, Ticket, tenant_id)
+    def __init__(
+        self,
+        db: Session,
+        tenant_id: str | None = None,
+        tenant_ids: list[str] | None = None,
+    ) -> None:
+        self.tenant_ids = list(dict.fromkeys(tenant_ids or ([tenant_id] if tenant_id else [])))
+        self.tenant_id = self.tenant_ids[0] if self.tenant_ids else ""
+        super().__init__(db, Ticket, self.tenant_id)
+
+    def _assert_tenant(self, obj: Ticket) -> None:
+        if getattr(obj, self.tenant_id_attr) not in self.tenant_ids:
+            raise PermissionError("Recurso de otro tenant")
 
     @staticmethod
     def _encrypt(value: str) -> str:
@@ -143,7 +159,7 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[TicketSummaryView], int]:
-        filters = [Ticket.tenant_id == self.tenant_id]
+        filters = [Ticket.tenant_id.in_(self.tenant_ids)]
         if status:
             filters.append(Ticket.status == status)
         if category:
@@ -208,7 +224,7 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         stmt = (
             select(TicketMessage)
             .join(Ticket, TicketMessage.ticket_id == Ticket.id)
-            .where(Ticket.tenant_id == self.tenant_id, TicketMessage.ticket_id == ticket_id)
+            .where(Ticket.tenant_id.in_(self.tenant_ids), TicketMessage.ticket_id == ticket_id)
             .order_by(TicketMessage.created_at.asc())
         )
         messages = list(self.db.scalars(stmt).all())

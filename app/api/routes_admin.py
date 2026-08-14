@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.deps import get_effective_tenant_ids, get_effective_tenant_ids_optional
 from app.core.permissions import CONFIGURE_TENANT, MANAGE_AI_POLICIES, require_permissions
 from app.database import get_db
 from app.models.policy import TenantPolicy
@@ -21,25 +22,21 @@ from app.services.audit import AuditService, get_audit_service
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _admin_service(db: Session, current_user: User, audit: AuditService) -> AdminService:
-    return AdminService(db, current_user=current_user, audit=audit)
+def _admin_service(db: Session, current_user: User, audit: AuditService, tenant_ids: list[str]) -> AdminService:
+    return AdminService(db, current_user=current_user, audit=audit, tenant_ids=tenant_ids)
 
 
 @router.get("/users", response_model=list[UserOut])
 def list_tenant_users(
     current_user: User = Depends(require_permissions(CONFIGURE_TENANT)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> list[User]:
-    if not current_user.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Rol sin tenant asignado",
-        )
     stmt = (
         select(User)
-        .where(User.tenant_id == current_user.tenant_id)
+        .where(User.tenant_id.in_(tenant_ids))
         .order_by(User.id)
         .limit(limit)
         .offset(offset)
@@ -51,10 +48,11 @@ def list_tenant_users(
 def create_user(
     payload: UserCreate,
     current_user: User = Depends(require_permissions(CONFIGURE_TENANT)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids_optional),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> User:
-    service = _admin_service(db, current_user, audit)
+    service = _admin_service(db, current_user, audit, tenant_ids)
     return service.create_user(
         email=payload.email,
         password=payload.password,
@@ -68,20 +66,22 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     current_user: User = Depends(require_permissions(CONFIGURE_TENANT)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids_optional),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> User:
-    service = _admin_service(db, current_user, audit)
+    service = _admin_service(db, current_user, audit, tenant_ids)
     return service.update_user(user_id, role=payload.role, is_active=payload.is_active)
 
 
 @router.get("/ai-policy", response_model=TenantPolicyOut)
 def get_tenant_policy(
     current_user: User = Depends(require_permissions(CONFIGURE_TENANT)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids_optional),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> TenantPolicy:
-    service = _admin_service(db, current_user, audit)
+    service = _admin_service(db, current_user, audit, tenant_ids)
     return service.get_tenant_policy()
 
 
@@ -89,10 +89,11 @@ def get_tenant_policy(
 def save_tenant_policy(
     payload: TenantPolicyIn,
     current_user: User = Depends(require_permissions(CONFIGURE_TENANT)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids_optional),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> TenantPolicy:
-    service = _admin_service(db, current_user, audit)
+    service = _admin_service(db, current_user, audit, tenant_ids)
     return service.save_tenant_policy(
         ai_enabled=payload.ai_enabled,
         tone=payload.tone,
@@ -105,10 +106,11 @@ def save_tenant_policy(
 @router.get("/ai-policies/global", response_model=GlobalPolicyOut)
 def get_global_policy(
     current_user: User = Depends(require_permissions(MANAGE_AI_POLICIES)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids_optional),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> GlobalPolicyOut:
-    service = _admin_service(db, current_user, audit)
+    service = _admin_service(db, current_user, audit, tenant_ids)
     policy = service.get_global_policy()
     return GlobalPolicyOut(**effective_global_policy(policy))
 
@@ -117,10 +119,11 @@ def get_global_policy(
 def save_global_policy(
     payload: GlobalPolicyIn,
     current_user: User = Depends(require_permissions(MANAGE_AI_POLICIES)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids_optional),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ) -> GlobalPolicyOut:
-    service = _admin_service(db, current_user, audit)
+    service = _admin_service(db, current_user, audit, tenant_ids)
     policy = service.save_global_policy(
         llm_model=payload.llm_model,
         ai_confidence_threshold=payload.ai_confidence_threshold,

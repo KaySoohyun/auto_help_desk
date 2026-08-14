@@ -57,18 +57,20 @@ class TicketSummarizer:
         db: Session,
         *,
         user_id: int | None,
-        tenant_id: str | None,
+        tenant_id: str | None = None,
+        tenant_ids: list[str] | None = None,
         orchestrator: LLMOrchestrator | None = None,
         audit: AuditPort | None = None,
         confidence_threshold: float | None = None,
     ) -> None:
         self._db = db
         self._user_id = user_id
-        self._tenant_id = tenant_id
+        self._tenant_ids = list(dict.fromkeys(tenant_ids or ([tenant_id] if tenant_id else [])))
+        self._tenant_id = self._tenant_ids[0] if self._tenant_ids else None
         self._orchestrator = orchestrator or LLMOrchestrator()
         self._audit = audit
         self._redactor = PiiRedactor()
-        self._repo = TicketRepository(db, tenant_id) if tenant_id else None
+        self._repo = TicketRepository(db, tenant_ids=self._tenant_ids) if self._tenant_ids else None
         # Override de GlobalPolicy (018): None = usar settings.
         self._confidence_threshold = (
             confidence_threshold if confidence_threshold is not None else settings.ai_confidence_threshold
@@ -80,12 +82,14 @@ class TicketSummarizer:
         *,
         trace_id: str | None = None,
     ) -> tuple[SummaryResult, AISuggestion]:
-        """Resume el ticket y persiste la sugerencia. Otro tenant → PermissionError."""
+        """Resume el ticket y persiste la sugerencia. Fuera del alcance → PermissionError."""
         if self._repo is None:
             raise PermissionError("Tenant no definido")
         ticket = self._repo.get_or_none(ticket_id)
         if ticket is None:
             raise PermissionError("Ticket no encontrado")
+        # El tenant efectivo es el del ticket (correcto con alcance de varios tenants).
+        tenant_id = ticket.tenant_id
         messages = self._repo.list_messages(ticket_id)
 
         history = "\n".join(f"- {m.body}" for m in messages[-5:])
@@ -103,7 +107,7 @@ class TicketSummarizer:
             task="summary",
             system=build_summary_system(),
             user=user_prompt,
-            tenant_id=self._tenant_id,
+            tenant_id=tenant_id,
             user_id=self._user_id,
             trace_id=trace_id,
         )
@@ -111,7 +115,7 @@ class TicketSummarizer:
         parsed = self._parse_output(result_payload["content"])
 
         suggestion = AISuggestion(
-            tenant_id=self._tenant_id,
+            tenant_id=tenant_id,
             ticket_id=ticket_id,
             type="summary",
             output={
@@ -132,7 +136,7 @@ class TicketSummarizer:
             self._audit.log(
                 "ai.summarized",
                 user_id=self._user_id,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 service="ai",
                 trace_id=trace_id,
                 result="success",

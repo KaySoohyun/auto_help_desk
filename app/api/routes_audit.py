@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.deps import get_effective_tenant_ids
 from app.core.permissions import VIEW_AUDIT, require_permissions
 from app.database import get_db
 from app.models.audit import AuditEvent
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 @router.get("/events", response_model=list[AuditEventOut])
 def list_audit_events(
     current_user: User = Depends(require_permissions(VIEW_AUDIT)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     action: str | None = Query(default=None),
@@ -28,14 +30,8 @@ def list_audit_events(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> list[AuditEvent]:
-    """Lista eventos de auditoría del tenant del usuario (append-only), con filtros."""
-    if not current_user.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Rol sin tenant asignado",
-        )
-
-    filters = [AuditEvent.tenant_id == current_user.tenant_id]
+    """Lista eventos de auditoría de los tenants del usuario (append-only), con filtros."""
+    filters = [AuditEvent.tenant_id.in_(tenant_ids)]
     if action:
         filters.append(AuditEvent.action == action)
     if service:
@@ -52,7 +48,7 @@ def list_audit_events(
     audit.log(
         "audit.view",
         user_id=current_user.id,
-        tenant_id=current_user.tenant_id,
+        tenant_id=tenant_ids[0] if tenant_ids else None,
         service="audit",
         result="success",
     )

@@ -45,19 +45,21 @@ class AnalyzeService:
         db: Session,
         *,
         user_id: int | None,
-        tenant_id: str | None,
+        tenant_id: str | None = None,
+        tenant_ids: list[str] | None = None,
         orchestrator: LLMOrchestrator | None = None,
         audit: AuditService | None = None,
         policy: dict[str, Any] | None = None,
     ) -> None:
         self._db = db
         self._user_id = user_id
-        self._tenant_id = tenant_id
+        self._tenant_ids = list(dict.fromkeys(tenant_ids or ([tenant_id] if tenant_id else [])))
+        self._tenant_id = self._tenant_ids[0] if self._tenant_ids else None
         self._policy = policy or {}
         self._orchestrator = orchestrator
         self._audit = audit
         self._redactor = PiiRedactor()
-        self._repo = TicketRepository(db, tenant_id) if tenant_id else None
+        self._repo = TicketRepository(db, tenant_ids=self._tenant_ids) if self._tenant_ids else None
 
     def _get_orchestrator(self) -> LLMOrchestrator:
         if self._orchestrator:
@@ -69,17 +71,10 @@ class AnalyzeService:
             rate_max_calls=self._policy.get("llm_rate_max_calls"),
         )
 
-    def _detect_pii(self, ticket_id: int) -> list[PiiDetection]:
+    def _detect_pii(self, ticket: Any) -> list[PiiDetection]:
         """Detecta PII en el contenido del ticket."""
-        if self._repo is None:
-            return []
-        
-        ticket = self._repo.get_or_none(ticket_id)
-        if ticket is None:
-            return []
-        
-        messages = self._repo.list_messages(ticket_id)
-        
+        messages = self._repo.list_messages(ticket.id)
+
         # Combinar todo el contenido
         content_parts = [ticket.subject, ticket.description]
         content_parts.extend(m.body for m in messages)
@@ -120,20 +115,16 @@ class AnalyzeService:
         
         return detections
 
-    def _get_kb_recommendations(self, ticket_id: int, limit: int = 5) -> list[KbRecommendation]:
+    def _get_kb_recommendations(self, ticket: Any, limit: int = 5) -> list[KbRecommendation]:
         """Busca artículos KB publicados recomendados por categoría del ticket."""
-        if self._repo is None:
+        if not ticket.category:
             return []
-        
-        ticket = self._repo.get_or_none(ticket_id)
-        if ticket is None or not ticket.category:
-            return []
-        
+
         # Buscar artículos publicados de la misma categoría
         stmt = (
             select(KbArticle)
             .where(
-                KbArticle.tenant_id == self._tenant_id,
+                KbArticle.tenant_id == ticket.tenant_id,
                 KbArticle.category == ticket.category,
                 KbArticle.status == "published"
             )
@@ -162,10 +153,12 @@ class AnalyzeService:
         """
         if self._repo is None:
             raise PermissionError("Tenant no definido")
-        
+
         ticket = self._repo.get_or_none(ticket_id)
         if ticket is None:
             raise PermissionError("Ticket no encontrado")
+        # El tenant efectivo es el del ticket (correcto con alcance de varios tenants).
+        tenant_id = ticket.tenant_id
         
         orchestrator = self._get_orchestrator()
         confidence_threshold = self._policy.get("ai_confidence_threshold")
@@ -188,7 +181,7 @@ class AnalyzeService:
             classifier = TicketClassifier(
                 self._db,
                 user_id=self._user_id,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 orchestrator=orchestrator,
                 audit=self._audit,
                 confidence_threshold=confidence_threshold,
@@ -202,7 +195,7 @@ class AnalyzeService:
             summarizer = TicketSummarizer(
                 self._db,
                 user_id=self._user_id,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 orchestrator=orchestrator,
                 audit=self._audit,
                 confidence_threshold=confidence_threshold,
@@ -216,7 +209,7 @@ class AnalyzeService:
             suggester = TicketReplySuggester(
                 self._db,
                 user_id=self._user_id,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 orchestrator=orchestrator,
                 audit=self._audit,
                 confidence_threshold=confidence_threshold,
@@ -270,10 +263,10 @@ class AnalyzeService:
             reply_dict = {"error": reply_error}
         
         # Detectar PII
-        pii_detected = self._detect_pii(ticket_id)
+        pii_detected = self._detect_pii(ticket)
         
         # Obtener recomendaciones KB
-        kb_recommendations = self._get_kb_recommendations(ticket_id)
+        kb_recommendations = self._get_kb_recommendations(ticket)
         
         # Construir riesgos
         risks = []

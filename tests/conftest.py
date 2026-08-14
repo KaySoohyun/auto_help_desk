@@ -16,15 +16,36 @@ from app.core.config import settings  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models.tenant import Tenant  # noqa: E402
 from app.models.user import User  # noqa: E402
 
 # El registro público (/auth/register) solo permite roles no admin (seguridad).
 PUBLIC_REGISTRATION_ROLES = {"agent", "supervisor"}
 
+# Tenants usados por las suites (el registro valida que el tenant exista).
+TEST_TENANT_IDS = [
+    "ten",
+    "ten-1",
+    "ten-2",
+    "ten-9",
+    "ten-a",
+    "ten-b",
+    "ten-m",
+    "ten-x",
+    "ten-y",
+    "ten-z",
+    "perf-tenant",
+    "t",
+]
+
 
 @pytest.fixture(autouse=True)
 def clean_db() -> Generator[None, None, None]:
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        for tid in TEST_TENANT_IDS:
+            db.add(Tenant(id=tid, name=tid, slug=tid))
+        db.commit()
     yield
     Base.metadata.drop_all(bind=engine)
 

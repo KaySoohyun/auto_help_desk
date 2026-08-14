@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import Any
 
 from app.core.config import settings
-from app.core.deps import get_trace_id
+from app.core.deps import get_effective_tenant_ids, get_trace_id
 from app.core.metrics import metrics
 from app.core.permissions import REQUEST_AI_SUGGESTION, VIEW_AUDIT, require_permissions
 from app.database import get_db
@@ -145,6 +145,7 @@ def classify_ticket(
     _: None = Depends(_ai_features_enabled),
     _tenant: None = Depends(_tenant_ai_enabled),
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_trace),
@@ -154,7 +155,7 @@ def classify_ticket(
     classifier = TicketClassifier(
         db,
         user_id=current_user.id,
-        tenant_id=current_user.tenant_id,
+        tenant_ids=tenant_ids,
         orchestrator=_orchestrator(audit, policy),
         audit=audit,
         confidence_threshold=policy["ai_confidence_threshold"],
@@ -195,6 +196,7 @@ def summarize_ticket(
     _: None = Depends(_ai_features_enabled),
     _tenant: None = Depends(_tenant_ai_enabled),
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_trace),
@@ -204,7 +206,7 @@ def summarize_ticket(
     summarizer = TicketSummarizer(
         db,
         user_id=current_user.id,
-        tenant_id=current_user.tenant_id,
+        tenant_ids=tenant_ids,
         orchestrator=_orchestrator(audit, policy),
         audit=audit,
         confidence_threshold=policy["ai_confidence_threshold"],
@@ -243,6 +245,7 @@ def suggest_reply(
     _tenant: None = Depends(_tenant_ai_enabled),
     body: SuggestedReplyRequest | None = None,
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_trace),
@@ -252,7 +255,7 @@ def suggest_reply(
     suggester = TicketReplySuggester(
         db,
         user_id=current_user.id,
-        tenant_id=current_user.tenant_id,
+        tenant_ids=tenant_ids,
         orchestrator=_orchestrator(audit, policy),
         audit=audit,
         confidence_threshold=policy["ai_confidence_threshold"],
@@ -296,6 +299,7 @@ def analyze_ticket(
     _: None = Depends(_ai_features_enabled),
     _tenant: None = Depends(_tenant_ai_enabled),
     current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
     db: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
     trace_id: str = Depends(_trace),
@@ -305,7 +309,7 @@ def analyze_ticket(
     analyzer = AnalyzeService(
         db,
         user_id=current_user.id,
-        tenant_id=current_user.tenant_id,
+        tenant_ids=tenant_ids,
         orchestrator=_orchestrator(audit, policy),
         audit=audit,
         policy=policy,
