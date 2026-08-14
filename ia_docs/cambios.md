@@ -2,6 +2,12 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-14 · Eliminado el endpoint de dashboard
+
+- Se eliminó `GET /v1/dashboard` (`app/api/routes_dashboard.py`, `app/schemas/dashboard.py`) y su registro en `app/main.py`.
+- El frontend ya no usa dashboard: `/app` redirige a `/app/tickets`.
+- Se quitaron los tests de dashboard de `tests/test_multi_tenant_scope.py`. Suite backend: **295 passed**.
+
 ## 2026-08-14 · Portal de personas (rol customer) — feature 021
 
 - **Rol `customer`** (`app/models/user.py` + `app/core/permissions.py`): nuevo rol de usuario final, permiso `persona:tickets`, agregado a `PUBLIC_REGISTRATION_ROLES`.

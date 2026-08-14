@@ -6,7 +6,6 @@ from app.api.routes_ai import router as ai_router
 from app.api.routes_audit import router as audit_router
 from app.api.routes_auth import router as auth_router
 from app.api.routes_customers import router as customers_router
-from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_kb import router as kb_router
 from app.api.routes_metrics import router as metrics_router
 from app.api.routes_persona import router as persona_router
@@ -34,7 +33,6 @@ app.include_router(ai_router)
 app.include_router(workspace_router)
 app.include_router(kb_router)
 app.include_router(customers_router)
-app.include_router(dashboard_router)
 app.include_router(persona_router)
 app.include_router(tenants_router)
 

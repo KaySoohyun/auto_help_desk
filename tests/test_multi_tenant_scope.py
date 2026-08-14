@@ -1,4 +1,4 @@
-"""Tests del alcance multi-tenant (registro con varios tenants), dashboard y tenants públicos."""
+"""Tests del alcance multi-tenant (registro con varios tenants) y tenants públicos."""
 
 from fastapi.testclient import TestClient
 
@@ -140,39 +140,6 @@ def _register_and_login(client: TestClient, email: str, tenant_id: str) -> dict:
     login = client.post("/auth/login", json={"email": email, "password": "segura-123"})
     assert login.status_code == 200, login.text
     return login.json()
-
-
-# === Dashboard ===
-
-
-def test_dashboard_kpis_scope_all_tenants(client: TestClient) -> None:
-    agent_a = _register_and_login(client, "a@example.com", tenant_id="ten-a")
-    agent_b = _register_and_login(client, "b@example.com", tenant_id="ten-b")
-    _create_ticket(client, agent_a, "dash-a")
-    _create_ticket(client, agent_b, "dash-b")
-
-    _register(client, "multi@example.com", ["ten-a", "ten-b"])
-    login = client.post("/auth/login", json={"email": "multi@example.com", "password": "segura-123"})
-    tokens = login.json()
-
-    resp = client.get("/v1/dashboard", headers=_headers(tokens))
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["ticketsAbiertos"] >= 2
-    assert data["ticketsSinAsignar"] >= 2
-    assert data["ticketsAsignadosAMi"] >= 0
-    assert data["ticketsSLAEnRiesgo"] >= 0
-
-
-def test_dashboard_requires_tenant_scope(client: TestClient) -> None:
-    resp = client.post(
-        "/auth/register",
-        json={"email": "nohome@example.com", "password": "segura-123", "role": "agent"},
-    )
-    assert resp.status_code == 201
-    login = client.post("/auth/login", json={"email": "nohome@example.com", "password": "segura-123"})
-    resp = client.get("/v1/dashboard", headers=_headers(login.json()))
-    assert resp.status_code == 403
 
 
 # === Tenants públicos ===
