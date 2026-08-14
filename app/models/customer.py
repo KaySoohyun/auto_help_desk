@@ -18,4 +18,5 @@ class Customer(Base):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     company: Mapped[str | None] = mapped_column(String(200), nullable=True)
     plan: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

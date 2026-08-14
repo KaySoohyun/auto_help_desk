@@ -4,6 +4,8 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 
 ## Hecho ✅
 
+20. **020 · Portal de personas (rol customer)** — rol `customer` vinculado a tenant + permiso `persona:tickets`; registro público crea su perfil en `customers` (`customers.user_id`); endpoints `/v1/me` (perfil, mis tickets, crear, detalle, mensajes) con aislamiento por customer y tenant; sin LLM. `293 passed`.
+
 19. **019 · Flujo multi-tenant y dashboard (portal empresas)** — alcance de tenant desde el JWT (`get_effective_tenant_ids`): tenant activo o todos los del usuario si saltea la selección; aplicado a tickets, dashboard, LLM, workspace, KB, customers, auditoría y administración; `GET /v1/dashboard` con KPIs reales; registro con varios tenants (`tenant_ids`); `POST /auth/clear-tenant`; `GET /v1/tenants/public`; `/auth/me` refleja el tenant activo del token; migraciones de esquema (`tickets.customer_id`, `tickets.language` default, `kb_article_tags.tag_id`). `285 passed`.
 
 18. **018 · CI/CD y operación** — dependencias reproducibles (`requirements*.txt` pinneados), pipeline CI (tests, `compileall`, chequeo de secretos, smoke `/health`, release con gate de aprobación), `__version__` en `/health` y `scripts/release.sh` (tag `vX.Y.Z`), rollout por tenants y feature flags conectados al runtime (`TenantPolicy.ai_enabled` → 403; `AI_FEATURES_ENABLED=false` → 503; overrides de `GlobalPolicy` aplicados al orquestador/guardrails/servicios IA), y operación (`ia_docs/operations/` con dashboard, alertas y runbooks). `216 passed` sin regresión.

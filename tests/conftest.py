@@ -20,7 +20,7 @@ from app.models.tenant import Tenant  # noqa: E402
 from app.models.user import User  # noqa: E402
 
 # El registro público (/auth/register) solo permite roles no admin (seguridad).
-PUBLIC_REGISTRATION_ROLES = {"agent", "supervisor"}
+PUBLIC_REGISTRATION_ROLES = {"agent", "supervisor", "customer"}
 
 # Tenants usados por las suites (el registro valida que el tenant exista).
 TEST_TENANT_IDS = [

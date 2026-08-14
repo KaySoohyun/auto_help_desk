@@ -19,6 +19,7 @@ from app.core.security import (
     verify_password,
 )
 from app.database import get_db
+from app.models.customer import Customer
 from app.models.tenant import Tenant
 from app.models.token import RefreshToken
 from app.models.user import User
@@ -38,7 +39,13 @@ from app.services.audit import AuditService, get_audit_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-PUBLIC_REGISTRATION_ROLES = {"agent", "supervisor"}
+PUBLIC_REGISTRATION_ROLES = {"agent", "supervisor", "customer"}
+
+
+def _customer_name_from_email(email: str) -> str:
+    """Nombre de display derivado del local-part del email (p. ej. juan.perez → Juan Perez)."""
+    local = email.split("@")[0]
+    return local.replace(".", " ").replace("_", " ").replace("-", " ").strip().title() or "Cliente"
 
 
 def _get_user_tenants(user: User, db: Session) -> list[TenantInfo]:
@@ -173,6 +180,21 @@ def register(
         repo = UserTenantRepository(db)
         for tenant_id in tenant_ids:
             repo.create(user.id, tenant_id, payload.role)
+
+    # El rol `customer` (portal de personas) crea su fila en `customers` vinculada
+    # al usuario para aislar "mis tickets" (tickets.customer_id).
+    if payload.role == "customer":
+        customer_tenant = tenant_ids[0] if tenant_ids else user.tenant_id
+        if customer_tenant:
+            db.add(
+                Customer(
+                    tenant_id=customer_tenant,
+                    name=_customer_name_from_email(payload.email),
+                    email=payload.email,
+                    user_id=user.id,
+                )
+            )
+            db.commit()
 
     audit.log(
         "auth.user_registered",

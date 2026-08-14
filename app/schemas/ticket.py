@@ -34,6 +34,7 @@ class TicketMessageOut(BaseModel):
 class TicketOut(BaseModel):
     id: int
     tenant_id: str
+    customer_id: int | None = None
     subject: str
     description: str
     category: str | None
@@ -49,6 +50,7 @@ class TicketOut(BaseModel):
 class TicketSummaryOut(BaseModel):
     id: int
     tenant_id: str
+    customer_id: int | None = None
     subject: str
     category: str | None
     priority: str | None

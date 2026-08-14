@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
-UserRole = Literal["platform_admin", "tenant_admin", "supervisor", "agent"]
+UserRole = Literal["platform_admin", "tenant_admin", "supervisor", "agent", "customer"]
 
 
 class User(Base):

@@ -19,6 +19,7 @@ class TicketView:
 
     id: int
     tenant_id: str
+    customer_id: int | None
     subject: str
     description: str
     category: str | None
@@ -35,6 +36,7 @@ class TicketSummaryView:
 
     id: int
     tenant_id: str
+    customer_id: int | None
     subject: str
     category: str | None
     priority: str | None
@@ -95,6 +97,7 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         return TicketSummaryView(
             id=ticket.id,
             tenant_id=ticket.tenant_id,
+            customer_id=ticket.customer_id,
             subject=self._decrypt(ticket.subject),
             category=ticket.category,
             priority=ticket.priority,
@@ -108,6 +111,7 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         return TicketView(
             id=ticket.id,
             tenant_id=ticket.tenant_id,
+            customer_id=ticket.customer_id,
             subject=self._decrypt(ticket.subject),
             description=self._decrypt(ticket.description),
             category=ticket.category,
@@ -126,9 +130,11 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         category: str | None = None,
         priority: str | None = None,
         assignee_id: int | None = None,
+        customer_id: int | None = None,
     ) -> TicketView:
         ticket = Ticket(
             tenant_id=self.tenant_id,
+            customer_id=customer_id,
             subject=self._encrypt(subject),
             description=self._encrypt(description),
             category=category,
@@ -154,6 +160,7 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         category: str | None = None,
         priority: str | None = None,
         assignee_id: int | None = None,
+        customer_id: int | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         limit: int = 50,
@@ -168,6 +175,8 @@ class TicketRepository(TenantScopedRepository[Ticket]):
             filters.append(Ticket.priority == priority)
         if assignee_id is not None:
             filters.append(Ticket.assignee_id == assignee_id)
+        if customer_id is not None:
+            filters.append(Ticket.customer_id == customer_id)
         if date_from:
             filters.append(Ticket.created_at >= date_from)
         if date_to:

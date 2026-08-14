@@ -16,6 +16,7 @@ MANAGE_AI_POLICIES = "ai_policies:manage"
 KB_READ = "kb:read"
 KB_EDIT = "kb:edit"
 KB_PUBLISH = "kb:publish"
+PERSONA_TICKETS = "persona:tickets"  # Portal de personas (usuario final)
 
 Permission: TypeAlias = str
 
@@ -54,6 +55,7 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
         KB_EDIT,
         KB_PUBLISH,
     },
+    "customer": {PERSONA_TICKETS},
 }
 
 ROLE_NAMES: set[str] = set(ROLE_PERMISSIONS.keys())

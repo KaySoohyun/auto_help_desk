@@ -2,6 +2,20 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-14 · Portal de personas (rol customer) — feature 021
+
+- **Rol `customer`** (`app/models/user.py` + `app/core/permissions.py`): nuevo rol de usuario final, permiso `persona:tickets`, agregado a `PUBLIC_REGISTRATION_ROLES`.
+- **Registro de cliente** (`app/api/routes_auth.py`): con rol `customer` se crea la fila en `customers` (name derivado del email, tenant del primer tenant seleccionado, `user_id`).
+- **Migración**: `scripts/migrate_customers_user_id.py` agrega `customers.user_id` (FK users.id, unique, nullable).
+- **Repositorio/schemas**: `TicketRepository.list` acepta filtro `customer_id`; `create` acepta `customer_id`; `TicketView`/`TicketSummaryView` y `TicketOut`/`TicketSummaryOut` exponen `customer_id`.
+- **Endpoints `/v1/me`** (`app/api/routes_persona.py`, permiso `persona:tickets`):
+  - `GET /v1/me` — perfil del cliente (id, name, email, company, tenant_id, tenant_name).
+  - `GET /v1/me/tickets` — mis tickets (aislado por customer + scope de tenants, filtros status/category/priority, paginación).
+  - `POST /v1/me/tickets` — crear ticket como cliente (setea customer_id).
+  - `GET /v1/me/tickets/{id}` — detalle aislado (404 cross-customer/tenant).
+  - `GET|POST /v1/me/tickets/{id}/messages` — thread y envío de mensaje manual (sin LLM).
+- **Tests**: `tests/test_persona_portal.py` (registro customer + perfil, flujo crear/listar, aislamiento cross-customer y cross-tenant, mensajes, 422 en ticket cerrado). Suite completa: **293 passed**.
+
 ## 2026-08-14 · Scope efectivo en LLM, workspace, admin, auditoría, KB y customers
 
 - **`app/core/deps.py`**: nueva dependency `get_effective_tenant_ids_optional` (devuelve `[]` en vez de 403) para rutas de administración donde `platform_admin` (sin tenant) opera a nivel plataforma.
