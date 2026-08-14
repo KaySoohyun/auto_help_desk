@@ -1,11 +1,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.categories import TICKET_CATEGORIES
 from app.core.deps import get_effective_tenant_ids
 from app.core.permissions import KB_EDIT, KB_PUBLISH, KB_READ, require_permissions
 from app.database import get_db
+from app.models.kb import KbArticle, KbArticleTag, KbArticleVersion, KbCategory
 from app.models.user import User
 from app.repositories.kb import KbRepository
 from app.schemas.kb import (
@@ -16,6 +19,7 @@ from app.schemas.kb import (
     KbArticleUpdate,
     KbArticleVersionOut,
 )
+from app.schemas.kb_category import KbCategoryCreate, KbCategoryOut
 from app.services.audit import AuditService, get_audit_service
 
 router = APIRouter(prefix="/v1/kb", tags=["kb"])
@@ -23,6 +27,96 @@ router = APIRouter(prefix="/v1/kb", tags=["kb"])
 
 def _get_trace_id() -> str:
     return str(uuid.uuid4())
+
+
+def _seed_default_categories(db: Session, tenant_ids: list[str]) -> None:
+    """Si el tenant aún no tiene categorías, siembra las categorías por defecto."""
+    for tenant_id in tenant_ids:
+        exists = db.query(KbCategory).filter(KbCategory.tenant_id == tenant_id).first()
+        if exists is not None:
+            continue
+        for cat in TICKET_CATEGORIES:
+            db.add(KbCategory(tenant_id=tenant_id, name=cat["label"]))
+        db.commit()
+
+
+@router.get("/categories", response_model=list[KbCategoryOut])
+def list_kb_categories(
+    current_user: User = Depends(require_permissions(KB_READ)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
+    db: Session = Depends(get_db),
+) -> list[KbCategory]:
+    """Lista las categorías de la base de conocimiento del/los tenant(s)."""
+    _seed_default_categories(db, tenant_ids)
+    stmt = (
+        select(KbCategory)
+        .where(KbCategory.tenant_id.in_(tenant_ids))
+        .order_by(KbCategory.name.asc())
+    )
+    return list(db.scalars(stmt).all())
+
+
+@router.post("/categories", response_model=KbCategoryOut, status_code=status.HTTP_201_CREATED)
+def create_kb_category(
+    payload: KbCategoryCreate,
+    current_user: User = Depends(require_permissions(KB_EDIT)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_get_trace_id),
+) -> KbCategory:
+    """Crea una categoría en el primer tenant activo del usuario."""
+    if not tenant_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Rol sin tenant asignado")
+    tenant_id = tenant_ids[0]
+    name = payload.name.strip()
+    existing = db.query(KbCategory).filter(
+        KbCategory.tenant_id == tenant_id, KbCategory.name == name
+    ).first()
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La categoría ya existe")
+    category = KbCategory(tenant_id=tenant_id, name=name)
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    audit.log(
+        "kb.category_created",
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+        service="kb",
+        model="KbCategory",
+        trace_id=trace_id,
+        detail={"category_id": category.id, "name": name},
+    )
+    return category
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_kb_category(
+    category_id: int,
+    current_user: User = Depends(require_permissions(KB_EDIT)),
+    tenant_ids: list[str] = Depends(get_effective_tenant_ids),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_get_trace_id),
+) -> None:
+    """Elimina una categoría del tenant (los artículos conservan su categoría en texto)."""
+    category = db.query(KbCategory).filter(
+        KbCategory.id == category_id, KbCategory.tenant_id.in_(tenant_ids)
+    ).first()
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoría no encontrada")
+    db.delete(category)
+    db.commit()
+    audit.log(
+        "kb.category_deleted",
+        user_id=current_user.id,
+        tenant_id=category.tenant_id,
+        service="kb",
+        model="KbCategory",
+        trace_id=trace_id,
+        detail={"category_id": category_id, "name": category.name},
+    )
 
 
 def _repo(db: Session, tenant_ids: list[str]) -> KbRepository:

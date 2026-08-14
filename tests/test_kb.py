@@ -294,3 +294,56 @@ def test_agent_cannot_create_articles(client: TestClient) -> None:
         headers=_headers(tokens),
     )
     assert response.status_code == 403
+
+
+# === Categorías de base de conocimiento ===
+
+
+def test_list_categories_seeds_defaults(client: TestClient) -> None:
+    tokens = register_login(client, "sup-cat@example.com", "supervisor", "ten-a")
+    resp = client.get("/v1/kb/categories", headers=_headers(tokens))
+    assert resp.status_code == 200
+    data = resp.json()
+    # Se sembraron las categorías por defecto del tenant
+    assert len(data) >= 1
+    assert all("id" in c and "name" in c for c in data)
+
+
+def test_create_category(client: TestClient) -> None:
+    tokens = register_login(client, "sup-cat2@example.com", "supervisor", "ten-a")
+    resp = client.post(
+        "/v1/kb/categories",
+        json={"name": "Instalaciones"},
+        headers=_headers(tokens),
+    )
+    assert resp.status_code == 201
+    assert resp.json()["name"] == "Instalaciones"
+
+    # Duplicado → 409
+    dup = client.post(
+        "/v1/kb/categories",
+        json={"name": "Instalaciones"},
+        headers=_headers(tokens),
+    )
+    assert dup.status_code == 409
+
+
+def test_delete_category(client: TestClient) -> None:
+    tokens = register_login(client, "sup-cat3@example.com", "supervisor", "ten-a")
+    created = client.post(
+        "/v1/kb/categories",
+        json={"name": "Temporal"},
+        headers=_headers(tokens),
+    ).json()
+    resp = client.delete(f"/v1/kb/categories/{created['id']}", headers=_headers(tokens))
+    assert resp.status_code == 204
+
+    missing = client.delete("/v1/kb/categories/999999", headers=_headers(tokens))
+    assert missing.status_code == 404
+
+
+def test_category_requires_edit_permission(client: TestClient) -> None:
+    # agent solo puede leer (kb:read), no crear
+    tokens = register_login(client, "agent-cat@example.com", "agent", "ten-a")
+    resp = client.post("/v1/kb/categories", json={"name": "X"}, headers=_headers(tokens))
+    assert resp.status_code == 403

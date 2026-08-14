@@ -58,3 +58,17 @@ class KbArticleTag(Base):
     # Relaciones
     article: Mapped["KbArticle"] = relationship("KbArticle", back_populates="tags")
     tag: Mapped["Tag"] = relationship("Tag")
+
+
+class KbCategory(Base):
+    """Categoría de la base de conocimiento, gestionable por tenant."""
+
+    __tablename__ = "kb_categories"
+    __table_args__ = (
+        Index("ix_kb_categories_tenant_name", "tenant_id", "name", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(64), ForeignKey("tenants.id"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
