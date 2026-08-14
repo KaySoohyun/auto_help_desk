@@ -34,6 +34,27 @@ _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 - Multi-tenant real (user_tenants) diferido para después de las tareas actuales
 - Documentado en `ia_docs/features/020-rediseo-detalle-ticket/`
 
+## 2026-08-14 · Feature 020: Rediseño del detalle de ticket (Backend) - COMPLETADA
+
+**Estado final:** Feature completada parcialmente con multi-tenant diferido.
+
+**Completado:**
+- ✅ Modelos: Tenant, Customer, Tag, TicketTag, KbArticleTag actualizado
+- ✅ Endpoints: /analyze, tags, customers, tenants
+- ✅ Servicio AnalyzeService con ejecución en paralelo
+- ✅ Seed de datos: 2 tenants, 6 customers, 7 tags
+- ✅ Tests: 276 tests pasan (260 anteriores + 16 nuevos)
+- ✅ Documentación actualizada
+
+**Diferido para futura implementación:**
+- ⏸️ Multi-tenant real con tabla user_tenants
+- ⏸️ Migración de users.tenant_id a user_tenants
+- ⏸️ Actualización del sistema de autenticación
+
+**Nota:** El sistema actual mantiene la compatibilidad con users.tenant_id. La implementación de multi-tenant real se realizará en una feature futura.
+
+---
+
 ## 2026-08-13 · Feature 019: Base de conocimiento (KB)
 
 - Implementación completa de endpoints `/v1/kb/*` para gestionar artículos de base de conocimiento por tenant.

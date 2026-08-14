@@ -75,18 +75,32 @@
 
 ## Paso 7: Seed y datos de prueba
 
-- [ ] **T7.1** Seed de tenants: "test-tenant", "acme-corp"
-- [ ] **T7.2** Seed de customers (3 por tenant)
-- [ ] **T7.3** Seed de tags de prueba por tenant
-- [ ] **T7.4** Migrar usuarios existentes a `user_tenants`
-- [ ] **T7.5** Actualizar tests existentes que usan `user.tenant_id`
+- [x] **T7.1** Seed de tenants: "test-tenant", "acme-corp"
+- [x] **T7.2** Seed de customers (3 por tenant)
+- [x] **T7.3** Seed de tags de prueba por tenant
+- [ ] **T7.4** Migrar usuarios existentes a `user_tenants` — **DEFERIDO**
+- [ ] **T7.5** Actualizar tests existentes que usan `user.tenant_id` — **DEFERIDO**
 
 ## Paso 8: Documentación
 
-- [ ] **T8.1** Actualizar `ia_docs/cambios.md`
-- [ ] **T8.2** Actualizar `ia_docs/features/020-rediseo-detalle-ticket/tasks.md` (marcar completadas)
-- [ ] **T8.3** Actualizar documentación de API (`api.md` en frontend)
-- [ ] **T8.4** Actualizar documentación de modelos (`models.md` en frontend)
+- [x] **T8.1** Actualizar `ia_docs/cambios.md`
+- [x] **T8.2** Actualizar `ia_docs/features/020-rediseo-detalle-ticket/tasks.md` (marcar completadas)
+- [x] **T8.3** Actualizar documentación de API (`api.md` en frontend)
+- [x] **T8.4** Actualizar documentación de modelos (`models.md` en frontend)
+
+## Estado final
+
+**Feature 020 completada parcialmente:**
+- ✅ Modelos: Tenant, Customer, Tag, TicketTag, KbArticleTag actualizado
+- ✅ Endpoints: /analyze, tags, customers, tenants
+- ✅ Servicio AnalyzeService con ejecución en paralelo
+- ✅ Tests: 276 tests pasan
+- ⏸️ Multi-tenant real (user_tenants) diferido para futura implementación
+
+**Próximos pasos (fuera del scope actual):**
+- Implementar multi-tenant real con tabla user_tenants
+- Migrar users.tenant_id a user_tenants
+- Actualizar sistema de autenticación para soportar múltiples tenants por usuario
 
 ## Notas
 
