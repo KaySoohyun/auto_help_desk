@@ -15,6 +15,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    tenant_id: str | None = None  # Opcional: si el usuario pertenece a múltiples tenants
 
 
 class RefreshRequest(BaseModel):
@@ -25,13 +26,26 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 
+class SwitchTenantRequest(BaseModel):
+    tenant_id: str
+
+
+class TenantInfo(BaseModel):
+    """Información básica de un tenant para el usuario."""
+    id: str
+    name: str
+    slug: str
+    role: str  # Rol del usuario en este tenant
+
+
 class UserOut(BaseModel):
     id: int
     email: EmailStr
-    role: str
-    tenant_id: str | None
+    role: str  # Rol principal (legacy, para compatibilidad)
+    tenant_id: str | None  # Tenant principal (legacy, para compatibilidad)
     is_active: bool
     created_at: datetime
+    tenants: list[TenantInfo] = []  # Lista de tenants a los que pertenece
 
     model_config = {"from_attributes": True}
 

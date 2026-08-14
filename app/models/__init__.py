@@ -9,3 +9,4 @@ import app.models.tenant  # noqa: F401
 import app.models.ticket  # noqa: F401
 import app.models.token  # noqa: F401
 import app.models.user  # noqa: F401
+import app.models.user_tenant  # noqa: F401

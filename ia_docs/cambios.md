@@ -2,6 +2,25 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-14 · Multi-tenant real implementado
+
+- **Modelo nuevo**: `UserTenant` (`app/models/user_tenant.py`) - Relación many-to-many entre usuarios y tenants con rol específico por tenant
+- **Modelo actualizado**: `User` ahora incluye relación `tenant_memberships` con `UserTenant`
+- **Schema nuevo**: `app/schemas/user_tenant.py` - UserTenantOut, UserTenantCreate, TenantInfo
+- **Schema actualizado**: `app/schemas/auth.py` - UserOut ahora incluye lista de tenants, LoginRequest acepta tenant_id, nuevo SwitchTenantRequest
+- **Repositorio nuevo**: `app/repositories/user_tenant.py` - UserTenantRepository con métodos para gestionar membresías
+- **Endpoints nuevos en auth**:
+  - `POST /auth/switch-tenant`: Cambiar de tenant después del login
+  - `GET /auth/tenants`: Listar tenants del usuario autenticado
+- **Endpoints actualizados**:
+  - `POST /auth/login`: Ahora acepta `tenant_id` opcional para seleccionar tenant al login
+  - `GET /auth/me`: Ahora devuelve lista de tenants del usuario con sus roles
+  - `POST /auth/register`: Crea automáticamente entrada en `user_tenants` si se especifica tenant_id
+- **Migración de datos**: Script `scripts/migrate_user_tenants.py` migró 190 usuarios existentes a `user_tenants`
+- **Tokens JWT**: Ahora incluyen tenant_id y role específicos del tenant seleccionado
+- **Tests**: 276 tests pasan (sin regresiones)
+- **Compatibilidad**: Se mantiene `users.tenant_id` por compatibilidad (se eliminará en futura migración)
+
 ## 2026-08-14 · Feature 020: Rediseño del detalle de ticket (Backend)
 
 - Implementación de nuevos modelos y endpoints para soportar el rediseño del detalle de ticket.
