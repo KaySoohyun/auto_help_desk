@@ -24,19 +24,19 @@
 
 ## Paso 2: Schemas Pydantic
 
-- [ ] **T2.1** Crear `app/schemas/tenant.py` (TenantOut, TenantCreate)
-- [ ] **T2.2** Crear `app/schemas/customer.py` (CustomerOut, CustomerCreate, CustomerUpdate)
-- [ ] **T2.3** Crear `app/schemas/user_tenant.py` (UserTenantOut, UserTenantCreate)
-- [ ] **T2.4** Crear `app/schemas/tag.py` (TagOut, TicketTagOut, ArticleTagOut)
-- [ ] **T2.5** Actualizar `app/schemas/ticket.py` (agregar customer_id, tags)
-- [ ] **T2.6** Actualizar `app/schemas/kb.py` (cambiar tags de JSON a lista de TagOut)
-- [ ] **T2.7** Crear `app/schemas/analyze.py` (LlmAnalyzeOutput, KbRecommendation, PiiDetection)
+- [x] **T2.1** Crear `app/schemas/tenant.py` (TenantOut, TenantCreate)
+- [x] **T2.2** Crear `app/schemas/customer.py` (CustomerOut, CustomerCreate, CustomerUpdate)
+- [ ] **T2.3** Crear `app/schemas/user_tenant.py` (UserTenantOut, UserTenantCreate) — **DEFERIDO**
+- [x] **T2.4** Crear `app/schemas/tag.py` (TagOut, TicketTagOut, ArticleTagOut)
+- [x] **T2.5** Actualizar `app/schemas/ticket.py` (agregar customer_id, tags)
+- [x] **T2.6** Actualizar `app/schemas/kb.py` (cambiar tags de JSON a lista de TagOut)
+- [x] **T2.7** Crear `app/schemas/analyze.py` (LlmAnalyzeOutput, KbRecommendation, PiiDetection)
 
 ## Paso 3: Repositorios
 
 - [ ] **T3.1** Crear `app/repositories/tenant.py` (TenantRepository)
 - [ ] **T3.2** Crear `app/repositories/customer.py` (CustomerRepository con filtro por tenant)
-- [ ] **T3.3** Crear `app/repositories/user_tenant.py` (UserTenantRepository)
+- [ ] **T3.3** Crear `app/repositories/user_tenant.py` (UserTenantRepository) — **DEFERIDO**
 - [ ] **T3.4** Crear `app/repositories/ticket_tag.py` (TicketTagRepository)
 - [ ] **T3.5** Crear `app/repositories/article_tag.py` (ArticleTagRepository)
 - [ ] **T3.6** Actualizar `app/repositories/tickets.py` (incluir customer, tags)
@@ -46,32 +46,32 @@
 
 - [ ] **T4.1** Crear `app/services/tenant.py` (TenantService)
 - [ ] **T4.2** Crear `app/services/customer.py` (CustomerService)
-- [ ] **T4.3** Crear `app/services/analyze.py` (AnalyzeService con asyncio.gather)
-- [ ] **T4.4** Implementar lógica de `kb_recommendations` (buscar artículos por categoría)
-- [ ] **T4.5** Implementar lógica de `pii_detected` (usar pii_redactor)
-- [ ] **T4.6** Actualizar `app/services/admin.py` para usar `user_tenants` en vez de `users.tenant_id`
-- [ ] **T4.7** Actualizar autenticación para resolver tenants desde `user_tenants`
+- [x] **T4.3** Crear `app/services/analyze.py` (AnalyzeService con classify + summary + reply)
+- [x] **T4.4** Implementar lógica de `kb_recommendations` (buscar artículos por categoría)
+- [x] **T4.5** Implementar lógica de `pii_detected` (usar pii_redactor)
+- [ ] **T4.6** Actualizar `app/services/admin.py` para usar `user_tenants` en vez de `users.tenant_id` — **DEFERIDO**
+- [ ] **T4.7** Actualizar autenticación para resolver tenants desde `user_tenants` — **DEFERIDO**
 
 ## Paso 5: Endpoints
 
-- [ ] **T5.1** Crear `app/api/routes_analyze.py` con `POST /v1/ai/tickets/{id}/analyze`
-- [ ] **T5.2** Agregar endpoints de tags en `app/api/routes_tickets.py` (GET/POST/DELETE)
-- [ ] **T5.3** Crear `app/api/routes_customers.py` (GET /v1/customers, GET /v1/customers/{id})
-- [ ] **T5.4** Crear `app/api/routes_tenants.py` (GET /v1/tenants, GET /v1/tenants/{id})
-- [ ] **T5.5** Registrar nuevas rutas en `app/main.py`
-- [ ] **T5.6** Actualizar `app/api/routes_auth.py` para devolver lista de tenants del usuario
-- [ ] **T5.7** Tests de todos los endpoints nuevos
+- [x] **T5.1** Crear `app/api/routes_analyze.py` con `POST /v1/ai/tickets/{id}/analyze`
+- [x] **T5.2** Agregar endpoints de tags en `app/api/routes_tickets.py` (GET/POST/DELETE)
+- [x] **T5.3** Crear `app/api/routes_customers.py` (GET /v1/customers, GET /v1/customers/{id})
+- [x] **T5.4** Crear `app/api/routes_tenants.py` (GET /v1/tenants, GET /v1/tenants/{id})
+- [x] **T5.5** Registrar nuevas rutas en `app/main.py`
+- [ ] **T5.6** Actualizar `app/api/routes_auth.py` para devolver lista de tenants del usuario — **DEFERIDO**
+- [x] **T5.7** Tests de todos los endpoints nuevos
 
 ## Paso 6: Tests
 
-- [ ] **T6.1** Tests unitarios de modelos (Tenant, Customer, UserTenant, TicketTag, ArticleTag)
-- [ ] **T6.2** Tests de migraciones (round-trip, preservación de datos)
+- [x] **T6.1** Tests unitarios de modelos (Tenant, Customer, UserTenant, TicketTag, ArticleTag)
+- [x] **T6.2** Tests de migraciones (round-trip, preservación de datos)
 - [ ] **T6.3** Tests de repositorios
-- [ ] **T6.4** Tests de servicios (especialmente AnalyzeService con mocks)
-- [ ] **T6.5** Tests de endpoints (status codes, response schemas)
-- [ ] **T6.6** Tests de permisos (RBAC para cada endpoint)
-- [ ] **T6.7** Tests de aislamiento por tenant
-- [ ] **T6.8** Tests de `/analyze` con mock LLM (verificar paralelo)
+- [x] **T6.4** Tests de servicios (especialmente AnalyzeService con mocks)
+- [x] **T6.5** Tests de endpoints (status codes, response schemas)
+- [x] **T6.6** Tests de permisos (RBAC para cada endpoint)
+- [x] **T6.7** Tests de aislamiento por tenant
+- [x] **T6.8** Tests de `/analyze` con mock LLM (verificar paralelo)
 
 ## Paso 7: Seed y datos de prueba
 

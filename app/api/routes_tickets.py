@@ -205,3 +205,114 @@ def close_ticket(
     metrics.inc("tickets_closed_total", labels={"tenant_id": current_user.tenant_id or ""})
     _audit(audit, current_user, "ticket.closed", ticket_id, trace_id)
     return ticket
+
+
+# === Endpoints de tags (Feature 012) ===
+
+from app.models.tag import Tag, TicketTag
+from app.schemas.tag import TagOut
+
+
+@router.get("/{ticket_id}/tags", response_model=list[TagOut])
+def list_ticket_tags(
+    ticket_id: int,
+    current_user: User = Depends(require_permissions(READ_TICKETS)),
+    db: Session = Depends(get_db),
+) -> list[TagOut]:
+    """Lista los tags de un ticket."""
+    repo = _repo(db, current_user)
+    _get_or_404(repo, ticket_id)
+    
+    # Obtener tags del ticket
+    ticket_tags = db.query(TicketTag).filter(TicketTag.ticket_id == ticket_id).all()
+    tag_ids = [tt.tag_id for tt in ticket_tags]
+    
+    if not tag_ids:
+        return []
+    
+    tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+    return [TagOut.model_validate(tag) for tag in tags]
+
+
+@router.post("/{ticket_id}/tags", status_code=status.HTTP_201_CREATED)
+def add_ticket_tag(
+    ticket_id: int,
+    payload: dict,
+    current_user: User = Depends(require_permissions(EDIT_RESPONSE)),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_get_trace_id),
+) -> dict:
+    """Agrega un tag a un ticket."""
+    repo = _repo(db, current_user)
+    _get_or_404(repo, ticket_id)
+    
+    tag_id = payload.get("tag_id")
+    if not tag_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tag_id es requerido",
+        )
+    
+    # Verificar que el tag existe y pertenece al tenant
+    tag = db.query(Tag).filter(Tag.id == tag_id, Tag.tenant_id == current_user.tenant_id).first()
+    if not tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag no encontrado",
+        )
+    
+    # Verificar que el tag no esté ya asociado
+    existing = db.query(TicketTag).filter(
+        TicketTag.ticket_id == ticket_id,
+        TicketTag.tag_id == tag_id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El tag ya está asociado al ticket",
+        )
+    
+    # Crear la asociación
+    ticket_tag = TicketTag(ticket_id=ticket_id, tag_id=tag_id)
+    db.add(ticket_tag)
+    db.commit()
+    
+    _audit(audit, current_user, "ticket.tag_added", ticket_id, trace_id, detail={"tag_id": tag_id, "tag_name": tag.name})
+    
+    return {"ticket_id": ticket_id, "tag_id": tag_id, "tag_name": tag.name}
+
+
+@router.delete("/{ticket_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_ticket_tag(
+    ticket_id: int,
+    tag_id: int,
+    current_user: User = Depends(require_permissions(EDIT_RESPONSE)),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_get_trace_id),
+) -> None:
+    """Quita un tag de un ticket."""
+    repo = _repo(db, current_user)
+    _get_or_404(repo, ticket_id)
+    
+    # Buscar la asociación
+    ticket_tag = db.query(TicketTag).filter(
+        TicketTag.ticket_id == ticket_id,
+        TicketTag.tag_id == tag_id
+    ).first()
+    
+    if not ticket_tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag no encontrado en el ticket",
+        )
+    
+    # Obtener info del tag para auditoría
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    tag_name = tag.name if tag else None
+    
+    db.delete(ticket_tag)
+    db.commit()
+    
+    _audit(audit, current_user, "ticket.tag_removed", ticket_id, trace_id, detail={"tag_id": tag_id, "tag_name": tag_name})

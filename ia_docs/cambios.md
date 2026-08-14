@@ -2,6 +2,38 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-14 · Feature 020: Rediseño del detalle de ticket (Backend)
+
+- Implementación de nuevos modelos y endpoints para soportar el rediseño del detalle de ticket.
+- **Modelos nuevos**:
+  - `Tenant` (`app/models/tenant.py`): id, name, slug, created_at
+  - `Customer` (`app/models/customer.py`): id, tenant_id FK, name, email, company, plan, created_at
+  - `Tag` (`app/models/tag.py`): id, tenant_id FK, name, created_at
+  - `TicketTag` (`app/models/tag.py`): ticket_id FK, tag_id FK (many-to-many)
+  - `KbArticleTag` actualizado para usar FK a Tag (antes string)
+  - `Ticket` actualizado con FK `customer_id` (nullable) y relación `tags`
+- **Schemas nuevos**:
+  - `app/schemas/tenant.py`: TenantOut, TenantCreate
+  - `app/schemas/customer.py`: CustomerOut, CustomerCreate, CustomerUpdate
+  - `app/schemas/tag.py`: TagOut, TicketTagOut
+  - `app/schemas/analyze.py`: AnalyzeOut, KbRecommendation, PiiDetection
+- **Servicio nuevo**:
+  - `app/services/analyze.py`: `AnalyzeService` que ejecuta classify, summary y suggested-reply en secuencia, más detección de PII y recomendaciones KB
+- **Endpoints nuevos**:
+  - `POST /v1/ai/tickets/{id}/analyze`: análisis unificado (classify + summary + reply + PII + KB recommendations)
+  - `GET /v1/tickets/{id}/tags`: lista tags del ticket
+  - `POST /v1/tickets/{id}/tags`: agrega tag al ticket
+  - `DELETE /v1/tickets/{id}/tags/{tag_id}`: quita tag del ticket
+  - `GET /v1/customers`: lista customers del tenant
+  - `GET /v1/customers/{id}`: detalle de customer
+  - `GET /v1/tenants`: lista tenants (requiere VIEW_AUDIT)
+  - `GET /v1/tenants/{id}`: detalle de tenant
+- **Seed**: `scripts/seed_tenants_customers.py` crea 2 tenants, 6 customers y 7 tags de prueba
+- **Tests**: 16 tests nuevos (6 para /analyze, 10 para tags/customers/tenants)
+- Suite backend: **276 tests pasados** (260 anteriores + 16 nuevos)
+- Multi-tenant real (user_tenants) diferido para después de las tareas actuales
+- Documentado en `ia_docs/features/020-rediseo-detalle-ticket/`
+
 ## 2026-08-13 · Feature 019: Base de conocimiento (KB)
 
 - Implementación completa de endpoints `/v1/kb/*` para gestionar artículos de base de conocimiento por tenant.

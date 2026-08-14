@@ -11,7 +11,9 @@ from app.database import get_db
 from app.models.policy import TenantPolicy
 from app.models.user import User
 from app.schemas.ai import ClassificationOut, SuggestedReplyOut, SuggestedReplyRequest, SummaryOut
+from app.schemas.analyze import AnalyzeOut
 from app.schemas.llm import LLMPingInfo
+from app.services.analyze import AnalyzeService
 from app.services.audit import AuditService, get_audit_service
 from app.services.classifier import ClassificationError, TicketClassifier
 from app.services.guardrails import Guardrails, OutputBlockedError
@@ -285,4 +287,50 @@ def suggest_reply(
         warnings=result.warnings,
         suggestion_id=suggestion.id,
         trace_id=trace_id,
+    )
+
+
+@router.post("/tickets/{ticket_id}/analyze", response_model=AnalyzeOut)
+def analyze_ticket(
+    ticket_id: int,
+    _: None = Depends(_ai_features_enabled),
+    _tenant: None = Depends(_tenant_ai_enabled),
+    current_user: User = Depends(require_permissions(REQUEST_AI_SUGGESTION)),
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+    trace_id: str = Depends(_trace),
+) -> AnalyzeOut:
+    """Analiza un ticket con IA: ejecuta classify, summary y suggested-reply en paralelo, más PII y KB recommendations."""
+    policy = PolicyResolver(db).effective_global()
+    analyzer = AnalyzeService(
+        db,
+        user_id=current_user.id,
+        tenant_id=current_user.tenant_id,
+        orchestrator=_orchestrator(audit, policy),
+        audit=audit,
+        policy=policy,
+    )
+    try:
+        result = analyzer.analyze(ticket_id, trace_id=trace_id)
+    except LLMRateLimitExceeded as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    except LLMUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="LLM no disponible"
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado") from exc
+    except OutputBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Contenido bloqueado por política de seguridad",
+        ) from exc
+    
+    return AnalyzeOut(
+        classification=result.classification,
+        summary=result.summary,
+        suggested_reply=result.suggested_reply,
+        kb_recommendations=result.kb_recommendations,
+        pii_detected=result.pii_detected,
+        risks=result.risks,
     )
