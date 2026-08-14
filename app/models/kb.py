@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -28,6 +28,9 @@ class KbArticle(Base):
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Relaciones
+    tags: Mapped[list["KbArticleTag"]] = relationship("KbArticleTag", back_populates="article", cascade="all, delete-orphan")
+
 
 class KbArticleVersion(Base):
     __tablename__ = "kb_article_versions"
@@ -46,8 +49,12 @@ class KbArticleVersion(Base):
 
 class KbArticleTag(Base):
     __tablename__ = "kb_article_tags"
-    __table_args__ = (Index("ix_kb_tags_article_tag", "article_id", "tag"),)
+    __table_args__ = (Index("ix_kb_tags_article_tag", "article_id", "tag_id", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     article_id: Mapped[int] = mapped_column(ForeignKey("kb_articles.id", ondelete="CASCADE"), index=True)
-    tag: Mapped[str] = mapped_column(String(50), index=True)
+    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), index=True)
+
+    # Relaciones
+    article: Mapped["KbArticle"] = relationship("KbArticle", back_populates="tags")
+    tag: Mapped["Tag"] = relationship("Tag")

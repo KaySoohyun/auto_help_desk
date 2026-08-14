@@ -4,6 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.categories import TICKET_CATEGORIES
 from app.core.permissions import EDIT_RESPONSE, READ_TICKETS, SEND_RESPONSE, require_permissions
 from app.core.metrics import metrics
 from app.database import get_db
@@ -26,6 +27,12 @@ def _get_trace_id() -> str:
     import uuid as _uuid
 
     return str(_uuid.uuid4())
+
+
+@router.get("/categories")
+def list_categories() -> list[dict[str, str]]:
+    """Lista las categorías disponibles para tickets."""
+    return TICKET_CATEGORIES
 
 
 def _repo(db: Session, user: User) -> TicketRepository:
@@ -83,7 +90,6 @@ def create_ticket(
         description=payload.description,
         category=payload.category,
         priority=payload.priority,
-        language=payload.language,
     )
     metrics.inc("tickets_created_total", labels={"tenant_id": current_user.tenant_id or ""})
     _audit(audit, current_user, "ticket.created", ticket.id, trace_id)
@@ -159,7 +165,12 @@ def add_message(
     trace_id: str = Depends(_get_trace_id),
 ) -> TicketMessageOut:
     repo = _repo(db, current_user)
-    _get_or_404(repo, ticket_id)
+    ticket = _get_or_404(repo, ticket_id)
+    if ticket.status == "closed":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No se pueden enviar mensajes a un ticket cerrado.",
+        )
     message = repo.add_message(ticket_id, current_user.id, payload.body)
     _audit(audit, current_user, "ticket.message", ticket_id, trace_id)
     return TicketMessageOut.model_validate(message)

@@ -167,7 +167,6 @@ def test_tenant_policy_save_and_get(client: TestClient) -> None:
     payload = {
         "ai_enabled": False,
         "tone": "formal",
-        "language": "es",
         "allowed_categories": ["billing", "technical"],
         "escalation_rules": {"max_hours": 24},
     }

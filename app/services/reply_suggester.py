@@ -102,7 +102,7 @@ class TicketReplySuggester:
             subject=subject,
             description=description,
             history=history,
-            locale=language or ticket.language,
+            locale=language or "es",
             tone=tone or "profesional",
         )
         result_payload = self._orchestrator.complete(

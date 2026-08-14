@@ -23,7 +23,6 @@ class TicketView:
     description: str
     category: str | None
     priority: str | None
-    language: str
     status: str
     assignee_id: int | None
     created_at: datetime
@@ -39,7 +38,6 @@ class TicketSummaryView:
     subject: str
     category: str | None
     priority: str | None
-    language: str
     status: str
     assignee_id: int | None
     created_at: datetime
@@ -84,7 +82,6 @@ class TicketRepository(TenantScopedRepository[Ticket]):
             subject=self._decrypt(ticket.subject),
             category=ticket.category,
             priority=ticket.priority,
-            language=ticket.language,
             status=ticket.status,
             assignee_id=ticket.assignee_id,
             created_at=ticket.created_at,
@@ -99,7 +96,6 @@ class TicketRepository(TenantScopedRepository[Ticket]):
             description=self._decrypt(ticket.description),
             category=ticket.category,
             priority=ticket.priority,
-            language=ticket.language,
             status=ticket.status,
             assignee_id=ticket.assignee_id,
             created_at=ticket.created_at,
@@ -113,7 +109,6 @@ class TicketRepository(TenantScopedRepository[Ticket]):
         description: str,
         category: str | None = None,
         priority: str | None = None,
-        language: str = "es",
         assignee_id: int | None = None,
     ) -> TicketView:
         ticket = Ticket(
@@ -122,7 +117,6 @@ class TicketRepository(TenantScopedRepository[Ticket]):
             description=self._encrypt(description),
             category=category,
             priority=priority,
-            language=language,
             status="open",
             assignee_id=assignee_id,
         )

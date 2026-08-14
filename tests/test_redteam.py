@@ -80,7 +80,6 @@ def _create_ticket(client: TestClient, tokens: dict, description: str) -> int:
             "description": description,
             "category": "general",
             "priority": "medium",
-            "language": "es",
         },
         headers=_headers(tokens),
     )

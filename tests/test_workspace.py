@@ -65,7 +65,6 @@ def _create_ticket(client: TestClient, tokens: dict, **overrides) -> dict:
         "description": "El usuario no puede entrar",
         "category": "technical",
         "priority": "high",
-        "language": "es",
     }
     payload.update(overrides)
     resp = client.post("/v1/tickets", json=payload, headers=_headers(tokens))

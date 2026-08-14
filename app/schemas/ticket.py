@@ -8,7 +8,6 @@ class TicketCreate(BaseModel):
     description: str = Field(min_length=1)
     category: str | None = Field(default=None, max_length=100)
     priority: str | None = Field(default=None, pattern="^(low|medium|high|urgent)$")
-    language: str = Field(default="es", max_length=10)
 
 
 class TicketUpdate(BaseModel):
@@ -39,7 +38,6 @@ class TicketOut(BaseModel):
     description: str
     category: str | None
     priority: str | None
-    language: str
     status: str
     assignee_id: int | None
     created_at: datetime
@@ -54,7 +52,6 @@ class TicketSummaryOut(BaseModel):
     subject: str
     category: str | None
     priority: str | None
-    language: str
     status: str
     assignee_id: int | None
     created_at: datetime

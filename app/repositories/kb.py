@@ -6,6 +6,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.kb import KbArticle, KbArticleTag, KbArticleVersion
+from app.models.tag import Tag
 from app.repositories.base import TenantScopedRepository
 
 
@@ -13,14 +14,31 @@ class KbRepository(TenantScopedRepository[KbArticle]):
     def __init__(self, db: Session, tenant_id: str) -> None:
         super().__init__(db, KbArticle, tenant_id)
 
+    def _get_or_create_tag(self, tag_name: str) -> Tag:
+        """Obtiene o crea un tag por nombre para el tenant actual."""
+        tag = self.db.query(Tag).filter(
+            Tag.tenant_id == self.tenant_id,
+            Tag.name == tag_name
+        ).first()
+        if not tag:
+            tag = Tag(tenant_id=self.tenant_id, name=tag_name)
+            self.db.add(tag)
+            self.db.flush()
+        return tag
+
     def get_tags(self, article_id: int) -> list[str]:
-        stmt = select(KbArticleTag.tag).where(KbArticleTag.article_id == article_id)
+        stmt = (
+            select(Tag.name)
+            .join(KbArticleTag, KbArticleTag.tag_id == Tag.id)
+            .where(KbArticleTag.article_id == article_id)
+        )
         return list(self.db.scalars(stmt).all())
 
     def set_tags(self, article_id: int, tags: list[str]) -> None:
         self.db.execute(delete(KbArticleTag).where(KbArticleTag.article_id == article_id))
-        for tag in tags:
-            self.db.add(KbArticleTag(article_id=article_id, tag=tag))
+        for tag_name in tags:
+            tag = self._get_or_create_tag(tag_name)
+            self.db.add(KbArticleTag(article_id=article_id, tag_id=tag.id))
         self.db.flush()
 
     def _with_tags(self, article: KbArticle) -> dict:
@@ -61,8 +79,13 @@ class KbRepository(TenantScopedRepository[KbArticle]):
         if category:
             filters.append(KbArticle.category == category)
         if tag:
-            subq = select(KbArticleTag.article_id).where(KbArticleTag.tag == tag)
-            filters.append(KbArticle.id.in_(subq))
+            # Buscar artículos que tengan el tag por nombre
+            tag_subq = (
+                select(KbArticleTag.article_id)
+                .join(Tag, KbArticleTag.tag_id == Tag.id)
+                .where(Tag.name == tag, Tag.tenant_id == self.tenant_id)
+            )
+            filters.append(KbArticle.id.in_(tag_subq))
         if search:
             pattern = f"%{search.lower()}%"
             filters.append(

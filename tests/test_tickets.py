@@ -16,7 +16,6 @@ def _create_ticket(client: TestClient, tokens: dict, **overrides) -> dict:
         "description": "El sistema no genera la factura del mes",
         "category": "billing",
         "priority": "high",
-        "language": "es",
     }
     payload.update(overrides)
     response = client.post("/v1/tickets", json=payload, headers=_headers(tokens))
@@ -128,6 +127,19 @@ def test_add_message_requires_edit_permission(client: TestClient) -> None:
         headers=_headers(tokens_b),
     )
     assert response.status_code == 404
+
+
+def test_add_message_to_closed_ticket_returns_422(client: TestClient) -> None:
+    tokens = register_login(client, "agent-closed@example.com", "agent", "ten-a")
+    created = _create_ticket(client, tokens)
+    client.post(f"/v1/tickets/{created['id']}/close", headers=_headers(tokens))
+    response = client.post(
+        f"/v1/tickets/{created['id']}/messages",
+        json={"body": "mensaje a ticket cerrado"},
+        headers=_headers(tokens),
+    )
+    assert response.status_code == 422
+    assert "cerrado" in response.json()["detail"].lower()
 
 
 def test_close_ticket(client: TestClient) -> None:

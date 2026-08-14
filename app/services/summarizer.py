@@ -97,7 +97,7 @@ class TicketSummarizer:
             subject=subject,
             description=description,
             history=history,
-            locale=ticket.language,
+            locale="es",
         )
         result_payload = self._orchestrator.complete(
             task="summary",

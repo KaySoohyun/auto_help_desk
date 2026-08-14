@@ -33,7 +33,7 @@ def _new_metrics(client: TestClient, tokens: dict) -> str:
 def _create(client: TestClient, tokens: dict, *, subject: str = "Problema", body: str = "Descripción") -> dict:
     resp = client.post(
         "/v1/tickets",
-        json={"subject": subject, "description": body, "language": "es"},
+        json={"subject": subject, "description": body},
         headers=_headers(tokens),
     )
     assert resp.status_code == 201, resp.text

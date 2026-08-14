@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -16,17 +16,20 @@ class Ticket(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[str] = mapped_column(String(64), index=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     subject: Mapped[str] = mapped_column(Text)  # cifrado
     description: Mapped[str] = mapped_column(Text, deferred=True)  # cifrado, carga diferida
     category: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     priority: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
-    language: Mapped[str] = mapped_column(String(10), default="es")
     status: Mapped[str] = mapped_column(String(20), default="open", index=True)
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
+
+    # Relaciones
+    tags: Mapped[list["TicketTag"]] = relationship("TicketTag", back_populates="ticket", cascade="all, delete-orphan")
 
 
 class TicketMessage(Base):

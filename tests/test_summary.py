@@ -78,7 +78,6 @@ def _create_ticket(client: TestClient, tokens: dict, **overrides) -> dict:
         "description": "El sistema no genera la factura del mes",
         "category": "billing",
         "priority": "high",
-        "language": "es",
     }
     payload.update(overrides)
     resp = client.post("/v1/tickets", json=payload, headers=_headers(tokens))
