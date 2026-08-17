@@ -2,6 +2,10 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-17 · README.md
+
+- Se creó `README.md` (estaba vacío) con la descripción del proyecto, stack, estructura, requisitos, instalación, cómo correr en local, tests, comandos útiles, resumen de API y seguridad.
+
 ## 2026-08-14 · Eliminado el endpoint de dashboard
 
 - Se eliminó `GET /v1/dashboard` (`app/api/routes_dashboard.py`, `app/schemas/dashboard.py`) y su registro en `app/main.py`.
