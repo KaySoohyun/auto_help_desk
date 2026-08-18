@@ -4,6 +4,8 @@ _Orden y estado de las features. Es la vista de "qué hay hecho, qué toca ahora
 
 ## Hecho ✅
 
+22. **022 · Seed de usuarios y tickets demo** — `scripts/seed_demo_users.py`: usuarios demo por rol con credenciales conocidas (`demo.agente/supervisor/admin/plataforma@example.com`, password `demo-pass-123`) con membresías en todos los tenants, `platform_admin` sin tenant, y un cliente demo por tenant (`demo.cliente.<slug>@example.com`) con su perfil en `customers`; tickets de ejemplo por empresa (cifrados, estados variados, algunos del cliente y asignados al agente). Idempotente y verificado contra FastAPI. `295 passed`.
+
 20. **020 · Portal de personas (rol customer)** — rol `customer` vinculado a tenant + permiso `persona:tickets`; registro público crea su perfil en `customers` (`customers.user_id`); endpoints `/v1/me` (perfil, mis tickets, crear, detalle, mensajes) con aislamiento por customer y tenant; sin LLM. `293 passed`.
 
 19. **019 · Flujo multi-tenant (portal empresas)** — alcance de tenant desde el JWT (`get_effective_tenant_ids`): tenant activo o todos los del usuario si saltea la selección; aplicado a tickets, LLM, workspace, KB, customers, auditoría y administración; registro con varios tenants (`tenant_ids`); `POST /auth/clear-tenant`; `GET /v1/tenants/public`; `/auth/me` refleja el tenant activo del token; migraciones de esquema (`tickets.customer_id`, `tickets.language` default, `kb_article_tags.tag_id`). `295 passed`. _(El dashboard se eliminó: `/app` redirige a tickets.)_

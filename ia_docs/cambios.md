@@ -2,6 +2,18 @@
 
 _Registro de cambios del proyecto. Formato: fecha · descripción · rama._
 
+## 2026-08-18 · Seed de usuarios y tickets demo — feature 022
+
+- **`scripts/seed_demo_users.py`** (nuevo): crea usuarios demo con credenciales conocidas para la presentación del producto y tickets de ejemplo por tenant.
+- **Usuarios demo** (password común `demo-pass-123`):
+  - `demo.agente@example.com` (agent) · `demo.supervisor@example.com` (supervisor) · `demo.admin@example.com` (tenant_admin) — cada uno con membresía (`user_tenants`) en **todos** los tenants existentes.
+  - `demo.plataforma@example.com` (platform_admin) — sin tenant, a nivel plataforma.
+  - `demo.cliente.<slug>@example.com` (customer) — uno por tenant, con su fila en `customers` (vinculada por `user_id`, mismo criterio que el registro de la feature 021).
+- **Tickets demo por tenant**: 5 tickets por empresa creados vía `TicketRepository` (cifrado AES-GCM en `subject`/`description`), con estados/prioridades/categorías variadas, algunos vinculados al cliente demo (`customer_id`) y asignados al agente demo, algunos con mensajes. Prefijo `[Demo]` en el asunto para detección idempotente.
+- **Idempotente**: re-ejecutar no duplica usuarios, membresías, customers ni tickets.
+- **Verificado** contra FastAPI (puerto local): login 200 con todos los demo users (con y sin `tenant_id`); `GET /v1/me/tickets` del cliente demo devuelve sus tickets; `platform_admin` demo lista `GET /v1/tenants`; agente demo lista/detalla tickets y mensajes.
+- **Suite backend: 295 passed** sin regresión. — `feat/init-landing`
+
 ## 2026-08-17 · README.md
 
 - Se creó `README.md` (estaba vacío) con la descripción del proyecto, stack, estructura, requisitos, instalación, cómo correr en local, tests, comandos útiles, resumen de API y seguridad.
